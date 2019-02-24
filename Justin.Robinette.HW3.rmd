@@ -1,0 +1,395 @@
+---
+title: "Homework #3"
+author: "Justin Robinette"
+date: "January 29, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+# install.packages(corrplot)
+library(ISLR)        #Weekly & Auto data sets
+library(corrplot)    #Plot Correlation
+library(ggplot2)     #Visualization
+library(knitr)       #Kable functionality
+library(gridExtra)   #Visualization
+library(dplyr)       #Data Manipulation
+library(GGally)      #Scatterplot Matrix Visualization
+```
+
+**Question 4.7.1, pg 168:** Using a little bit of algebra, prove that (4.2) is equivalent to (4.3). In other words, the logistic function representation and the logit representation for the logistic regression model are equivalent.
+
+**Results:** 
+*Logistic Function:* \[p(X) = \frac{e^{\beta_0+\beta_1X}}{1 + e^{\beta_0+\beta_1X}}\]
+*Step 1:* \[\frac{1}{p(X)} = \frac{1+e^{\beta_0 + \beta_1X}}{e^{\beta_0 + \beta_1X}}\]
+*Step 2:* \[\frac{1}{p(X)} = \frac{1}{e^{\beta_0+\beta_1X}} + \frac{e^{\beta_0+\beta_1X}} {e^{\beta_0+\beta_1X}}\]
+*Step 3:* \[\frac{1}{p(X)} = 1 + \frac{1}{e^{\beta_0 + \beta_1X}}\]
+*Step 4:* \[e^{\beta_0 + \beta_1X} = \frac{p(X)}{1-p(X)}\]
+*Which gives us the same equation as 4.3* \[\frac{p(X)}{1-p(X)} = e^{\beta_0+\beta_1X}\]
+
+
+**Question 4.7.10, pg 171:** This question should be answered using teh **Weekly** data set, which is part of the *ISLR* package. This data is similar in nature to the **Smarket** data from this chapter's lab, exceot that it contains 1,089 weekly returns for 21 years, from the beginning of 1990 to the end of 2010.
+
+**Part A:** Produce some numerical and graphical summaries of the **Weekly** data. Do there appear to be any patterns?
+
+**Results:** First, I loaded the dataset and printed a summary to scan for NAs as well as examine the variables. Next, I created a numerical depiction of the Direction variable to better examine correlation between variables. I then printed a correlation matrix where we only see strong correlations between the Direction and Today, which is somewhat expected since we are measuring a the direction of the week, and between Volume and Year. A correlation plot was included which visually represents the data in the correlation matrix. 
+
+At this point, the only true pattern that I see is a correlation between the Volume and the Year. Therefore, a plot is done to further examine this relationship. The plot shows us that the Volume generally is increasing from year to year. An analogous base R plot is included. 
+
+```{r}
+data("Weekly", package = "ISLR")
+# head(Weekly, 3)
+
+# review summary of data
+summary(Weekly)
+
+# add a numeric factor
+Weekly$NumDirection <- ifelse (Weekly$Direction == 'Down', 0, 1)
+
+# print correlation matrix
+Weekly_corr <- round(cor(Weekly[, -9]),4)
+kable(Weekly_corr)
+
+# print visual of correlation matrix
+corrplot(Weekly_corr, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+
+# plot volume vs Year
+ggplot(Weekly, aes(x = Year, y = Volume)) +
+  geom_point() +
+  labs(x = "Year", y = "Volume", title = "Volume vs. Year - ggplot") +
+  theme(plot.title = element_text(hjust = 0.5))
+plot(Volume ~ Year, data = Weekly, main = "Volume vs. Year - base R")
+```
+
+**Part B:** Use the fully data set to perform a logistic regression with **Direction** as the response and the five *lag* variables plus **Volume** as predictors. Use the summary function to print the results. Do any of the predictors appear to be statistically significant? If so, which ones?
+
+**Results** A model was fit using the instructions from the text, and a summary was printed per the same instructions. Additionally, for readability, I included a table of the p-values extracted from the summary. 
+
+Based on these outputs, aside from the Intercept, it appears that *"Lag2"* is the only predictor that is statistically significant at an alpha = 0.05. *Lag2*, per the ISLR documentation, represents the Percentage return for 2 weeks previous to the week being measured. 
+
+```{r}
+# fit model per assignment instructions
+Weekly.glm <- glm(formula = Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+                  family = binomial, data = Weekly)
+# print summary
+summary(Weekly.glm)
+
+# easier sumamry of p-values than summary
+kable(summary(Weekly.glm)$coefficients[,4], col.names = "P-Value",
+      caption = "P-Values of Predictors for Direction")
+```
+
+**Part C:** Compute the confusion matrix and overall fraction of correct predictions. Explain what the confusion matrix is telling you about the types of mistakes made by logistic regression.
+
+**Results:** First, I used the predict() function to predict Direction using the Weekly.glm model provided by the text book. Next, I added the predictions to the Weekly data set and printed a confusion matrix showing the breakdown of *Direction* predictions versus the observed *Direction*. 
+
+Next, per the instructions, I printed the overall fraction of correct predictions. I also included the overall accuracy as a percentage as I think that reads better. I rounded both outputs to 3 decimal places. 
+
+Lastly, per the instructions, I analyzed the types of the mistakes made by the model. The last table shows the percentage of correct predictions, by the model, based on whether the *Direction* was Up or Down in the given week. As we can see, in weeks whether the market was up, the model is ~92% accurate. In weeks when the market was down, the model is only ~11% accurate. 
+
+```{r}
+# created prediction factor for Direction from glm above
+Weekly.probs <- predict(Weekly.glm, type = "response") 
+Weekly.pred <- as.factor(ifelse(Weekly.probs > 0.5, "Up", "Down"))
+
+# join predictions with Weekly data set
+Weekly <- as.data.frame(cbind(Weekly, Weekly.pred))
+
+# added column depicting the prediction results of the model
+Weekly$PredResult <- ifelse(Weekly$Direction == Weekly$Weekly.pred, "Correct", "Wrong")
+
+# print confusion matrix
+confmatr <- table(Weekly$Direction, Weekly$Weekly.pred)
+names(dimnames(confmatr)) <- c("Observed", "Predicted")
+confmatr
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly$Direction)
+
+# print fraction of correct predictions
+Weekly.accuracy <- (confmatr[1,1] + confmatr[2,2])/sum(nrow(Weekly))*100
+paste("The percentage of accurate predictions is:",round(Weekly.accuracy, 3),"% (rounded to 3 decimals)")
+paste("The overall fraction of correct predictions is:",confmatr[1,1]+confmatr[2,2],"/",sum(nrow(Weekly)))
+
+# calculate accuracy of model depending on Direction
+Weekly.sensitivity <- round((confmatr[2,2]/(confmatr[2,2]+confmatr[2,1])*100), 3)
+Weekly.specificity <- round((confmatr[1,1]/(confmatr[1,1]+confmatr[1,2])*100), 3)
+
+# print results
+kable(cbind(Weekly.sensitivity, Weekly.specificity), col.names = c("Accuracy when Market is Up",
+                                                                   "Accuracy when Market is Down")
+      , caption = "Percentage Accuracy by Market Movement")
+```
+
+**Part D:** Now fit the logistic regression model using a training data period from 1990 to 2008, with **Lag2** as the only predictor. Compute the confusion matrix and the overall fraction of correct predictions for the held out data (that is, the data from 2009 and 2010).
+
+**Results:** To complete this exercise, first I removed the prediction results from the **Weekly** data set from early exercises. Then I created subsets of training and test data sets using the years 2009 and 2010 as the test data and the prior years as the training set. 
+
+Then, I fit a model using only the **Lag2** variable as a predictor of **Direction**, using the training set to build the model. 
+
+I then used the model to predict the direction in the test data set and printed the confusion matrix and overall fraction of correct predictions, as instructed. I also included the percentage of accuracy for easier analysis.
+
+Lastly, I included a comparison of *Model 1* (the model that uses all predictors of Direction from Parts B and C) and *Model 2* (the model that only uses "Lag2") as a predictor.
+
+As we can see, despite using training/test data sets which often give less accurate predictions, the model that only uses "Lag2" to predict "Direction" is more accurate.
+
+*Per the homework instructions, I've skipped Parts E-I.*
+
+```{r}
+# remove previous prediction results from Weekly
+Weekly <- within(Weekly, rm(Weekly.pred, PredResult))
+# subset into train and test sets 
+Weekly.training <- subset(Weekly, Year < 2009)
+Weekly.test <- subset(Weekly, Year >= 2009)
+
+# fit model, per homework
+Weekly.glm2 <- glm(formula = Direction ~ Lag2, data = Weekly.training, family = binomial)
+summary(Weekly.glm2)
+
+# create prediction factor for Direction from glm above
+test.probs <- predict(Weekly.glm2, Weekly.test, type = "response")
+test.pred <- as.factor(ifelse(test.probs > 0.5, "Up", "Down"))
+
+# join the predictions into test data set
+Weekly.test <- as.data.frame(cbind(Weekly.test, test.pred))
+
+# print confusion matrix
+confmatr2 <- table(Weekly.test$Direction, Weekly.test$test.pred)
+names(dimnames(confmatr2)) <- c("Observed", "Predicted")
+confmatr2
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct predictions
+test.accuracy <- (confmatr2[1,1] + confmatr2[2,2])/sum(nrow(Weekly.test))*100
+paste("The percentage of accurate predictions in test set is:",test.accuracy,
+      "% (rounded to 3 decimals)")
+paste("The overall fraction of correct predictions in the test set is:",(confmatr2[1,1]+confmatr2[2,2]),
+      "/",sum(nrow(Weekly.test)))
+
+# print results
+kable(cbind(Weekly.accuracy, test.accuracy), col.names = c("Accuracy of Model 1",
+                                                                   "Accuracy of Model 2")
+      , caption = "Percentage Accuracy by Model")
+```
+
+**Question 4.7.11, pg 172:** In this problem, you will develop a model to predict whether a given car gets high or low gas mileage based on the **Auto** data set. 
+
+**Part A:** Create a binary variable **mpg01**, that contains a 1 if **mpg** contains a value above its median, and a 0 if **mpg** contains a value below the median.
+
+**Results:** I created the variable "mpg01" per the instructions using the condition of whether or not the "mpg" value for each observation is above or below the median value of "mpg". I printed the header to confirm the creation of the variable. 
+
+```{r}
+# load Auto dataset
+data("Auto", package = "ISLR")
+
+# create variable with conditions from exercise
+Auto$mpg01 <- as.factor(ifelse(Auto$mpg > median(Auto$mpg), 1, 0))
+Auto <- Auto %>% select(mpg01, everything())
+head(Auto, 3)
+```
+
+**Part B:** Explore the data set graphically in order to investigate the association between **mpg01** and the other features. Which of the other features seem most likely to be useful in predicting **mgp01**? Scatterplots and boxplots may be useful tools to answer this question. Describe your findings.
+
+**Results:** First, I printed boxplots showing the relationship between the binary variable **mpg01** and the other predictors. From these plots, it appears to me that the most useful features are *Cylinders, Displacement, Horsepower and Weight.* There appears to be a possibly useful correlation between the dependent variable and *Year*, but I will examine that later in this exercise. Base R plots are included for reference.
+
+Next, I printed a table showing the correlation values of each variable as well as a corresponding correlation plot to visually depict the table. These two visuals confirm that *Cylinders, Displacement, Horsepower and Weight* will be useful predictors. The correlation between the response variable and *Year* still appears to be somewhat relevant but I am not sure if it will help the model. I will create two models, one with *Year* and one without to compare. 
+
+Lastly, to confirm my selections, I included scatterplot matrices and looked at the relationships again. These matrices confirm my decision in the prior paragraph. Analagous base R plots have been included per homework guidelines. 
+
+```{r}
+# boxplots to look at best predictors
+fillorder <- c("green", "blue")
+cyl_plot <- ggplot(Auto, aes(x = mpg01, y = cylinders, fill = mpg01)) +
+  geom_boxplot(aes(fill = mpg01)) +
+  labs(x = "MPG", y = "Cylinders", title = "MPG by Cylinders") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_manual(values = fillorder, labels = c("Below Median", "Above Median"))
+disp_plot <- ggplot(Auto, aes(x = mpg01, y = displacement, fill = mpg01)) +
+  geom_boxplot(aes(fill = mpg01)) +
+  labs(x = "MPG", y = "Displacement", title = "MPG by Displacement") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_manual(values = fillorder, labels = c("Below Median", "Above Median"))
+hsp_plot <- ggplot(Auto, aes(x = mpg01, y = horsepower, fill = mpg01)) +
+  geom_boxplot(aes(fill = mpg01)) +
+  labs(x = "MPG", y = "Horsepower", title = "MPG by Horsepower") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_manual(values = fillorder, labels = c("Below Median", "Above Median"))
+wgt_plot <- ggplot(Auto, aes(x = mpg01, y = weight, fill = mpg01)) +
+  geom_boxplot(aes(fill = mpg01)) +
+  labs(x = "MPG", y = "Weight", title = "MPG by Weight") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_manual(values = fillorder, labels = c("Below Median", "Above Median"))
+acc_plot <- ggplot(Auto, aes(x = mpg01, y = acceleration, fill = mpg01)) +
+  geom_boxplot(aes(fill = mpg01)) +
+  labs(x = "MPG", y = "Acceleration", title = "MPG by Acceleration") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_manual(values = fillorder, labels = c("Below Median", "Above Median"))
+year_plot <- ggplot(Auto, aes(x = mpg01, y = year, fill = mpg01)) +
+  geom_boxplot(aes(fill = mpg01)) +
+  labs(x = "MPG", y = "Year", title = "MPG by Year") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_manual(values = fillorder, labels = c("Below Median", "Above Median"))
+origin_plot <- ggplot(Auto, aes(x = mpg01, y = origin, fill = mpg01)) +
+  geom_boxplot(aes(fill = mpg01)) +
+  labs(x = "MPG", y = "Origin", title = "MPG by Origin") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_manual(values = fillorder, labels = c("Below Median", "Above Median"))
+grid.arrange(cyl_plot, disp_plot, ncol = 1)
+grid.arrange(hsp_plot, wgt_plot, ncol = 1)
+grid.arrange(acc_plot, year_plot, ncol = 1)
+origin_plot
+# same boxplots in base R
+par(mfrow = c(1,2))
+plot(Auto$cylinders ~ Auto$mpg01, xlab = "MPG", ylab = "Cylinders", main = "MPG by Cylinders")
+plot(Auto$displacement ~ Auto$mpg01, xlab = "MPG", ylab = "Displacement", main = "MPG by Displacement")
+plot(Auto$horsepower ~ Auto$mpg01, xlab = "MPG", ylab = "Horsepower", main = "MPG by Horsepower")
+plot(Auto$weight ~ Auto$mpg01, xlab = "MPG", ylab = "Weight", main = "MPG by Weight")
+plot(Auto$acceleration ~ Auto$mpg01, xlab = "MPG", ylab = "Acceleration", main = "MPG by Acceleration")
+plot(Auto$year ~ Auto$mpg01, xlab = "MPG", ylab = "Year", main = "MPG by Year")
+par(mfrow = c(1,1))
+plot(Auto$origin ~ Auto$mpg01, xlab = "MPG", ylab = "Origin", main = "MPG by Origin")
+
+# scatterplot matrix to analyze correlation with mpg01
+Auto$mpg01 <- as.numeric(ifelse(Auto$mpg01 == 0, 0, 1))
+Auto_corr <- round(cor(Auto[,c(1, 3:9)]),4)
+kable(Auto_corr)
+
+# print visual of correlation matrix
+corrplot(Auto_corr, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+
+# scatterplot matrix of correlation between continuous variables and mpg01
+ggpairs(Auto[, c(1, 3, 4, 5, 6)], upper = list(continuous = wrap("cor"))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggpairs(Auto[, c(1, 7, 8, 9)], upper = list(continuous = wrap("cor"))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+# analogous base R plots
+pairs(Auto[, c(1, 3, 4, 5, 6)])
+pairs(Auto[, c(1, 7, 8, 9)])
+```
+
+**Part C:** Split the data into training and test sets.
+
+**Results:** Here I set a sample size to extract 75% of the data set as training data and 25% as testing data. I set a seed for reproducibility and split the sets. 
+
+To confirm, I printed the number of rows in each of the 3 data sets.
+
+```{r}
+# create a sample size of 75% of the sample
+sample.size <- (0.75 * nrow(Auto))
+
+# set seed for reproducibility
+set.seed(621)
+train_ind <- sample(seq_len(nrow(Auto)), size = sample.size)
+
+# split into train and test
+Auto.train <- Auto[train_ind, ]
+Auto.test <- Auto[-train_ind, ]
+
+kable(cbind(sum(nrow(Auto)), sum(nrow(Auto.train)), sum(nrow(Auto.test))), 
+      col.names = c("# Rows Auto", "# Rows Train", "# Rows Test"), 
+      caption = "# of Rows in Each Data Set")
+```
+
+*Per the Homework PDF, I've skipped Parts D and E*
+
+**Part F:** Perform logistic regression on the training data in order to predict **mpg01** using the variables that seemed most associated with **mpg01** in (b). What is the test error of the model obtained?
+
+**Results:** First, I fit both two models with the predictors discussed in (b). The first model included *Year* as a predictor, while the second model did not. I first compared the two models by comparing the p-values of the predictors. In the first model, **Weight, Horsepower and Year** are significant predictors. In the second model, we see that **Horsepower and Displacement** are the only significant predictors with p-values below our alpha of 0.05. The *Weight* variable is no longer significant when *Year* is removed from the modeling. This is interesting since *Year* was a predictor that did not appear to be as strong of a correlated variable as the others in part (b).
+
+Next, I compared the AIC (Akaike Information Criterion) value is useful in comparing models to see which "fit" the data better. The lower AIC indicates a superior model. Here we see that the model with Year as a predictor is superior, according to AIC. Next we'll see if this superiority translates to better results when using them on our test data set. 
+
+Lastly, I used the two models to predict the test data set **mpg01** values. Then I printed the confusion matrices, accuracies, and fractions of accuracies for both models. Then, per assignment instructions, I also showed the error rate for each model.
+
+As we can see, predictably (from the AIC discussion above), the model with *Year* included as a predictor is better at predicting the response variable in the test data. 
+
+```{r}
+# fit both models discussed in (b)
+Auto.glm <- glm(formula = mpg01 ~ cylinders + weight + displacement + horsepower + year,
+                 data = Auto.train, family = binomial)
+Auto.glm2 <- glm(formula = mpg01 ~ cylinders + weight + displacement + horsepower,
+                 data = Auto.train, family = binomial)
+
+# print comparison of p-values and AIC to analyze inclusion of 'Year'
+kable(coef(summary(Auto.glm))[,4], col.names = "P-Values",
+      caption = "P-Values of Predictors with Year Included")
+kable(coef(summary(Auto.glm2))[,4], col.names = "P-Values",
+      caption = "P-Values of Predictors without Year Included")
+kable(cbind(AIC(Auto.glm), AIC(Auto.glm2)), col.names = c("AIC of Model with Year", 
+                                                          "AIC of Model without Year"),
+      caption = "Comparison of AIC Values")
+
+# create prediction factor for models
+test1.probs <- predict(Auto.glm, Auto.test, type = "response")
+test2.probs <- predict(Auto.glm2, Auto.test, type = "response")
+test1.pred <- as.factor(ifelse(test1.probs > 0.5, 1, 0))
+test2.pred <- as.factor(ifelse(test2.probs > 0.5, 1, 0))
+
+# join the predictions into the test data set
+Auto.test <- as.data.frame(cbind(Auto.test, test1.pred, test2.pred))
+
+# print confusion matrix
+auto.confmatr1 <- table(Auto.test$mpg01, Auto.test$test1.pred)
+names(dimnames(auto.confmatr1)) <- c("Observed", "Predicted #1")
+auto.confmatr2 <- table(Auto.test$mpg01, Auto.test$test2.pred)
+names(dimnames(auto.confmatr2)) <- c("Observed", "Predicted #2")
+auto.confmatr1
+auto.confmatr2
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Auto.test$mpg01)
+
+# print fraction of correct predictions
+test1.accuracy <- (auto.confmatr1[1,1] + auto.confmatr1[2,2])/sum(nrow(Auto.test))*100
+test2.accuracy <- (auto.confmatr2[1,1] + auto.confmatr2[2,2])/sum(nrow(Auto.test))*100
+paste("The percentage of accurate predictions in test set is:",round(test1.accuracy,3),
+      "% (rounded to 3 decimals)")
+paste("The overall fraction of correct predictions in the test set is:",
+      (auto.confmatr1[1,1]+auto.confmatr1[2,2]),
+      "/",sum(nrow(Auto.test)))
+paste("The percentage of accurate predictions in test set is:",round(test2.accuracy,3),
+      "% (rounded to 3 decimals)")
+paste("The overall fraction of correct predictions in the test set is:",
+      (auto.confmatr2[1,1]+auto.confmatr2[2,2]),
+      "/",sum(nrow(Auto.test)))
+
+# print results
+kable(cbind(100-test1.accuracy, 100-test2.accuracy), col.names = c("Error Rate of Model 1 (with Year)",
+                                                                   "Error Rate of Model 2 (w/out Year)")
+      , caption = "Test Error by Model")
+```
+
+**Question 4:** Write a function in RMD that calculates the misclassification rate, sensitivity, and specificity. The inputs for this function are a cutoff point, predicted probabilities, and original binary response. Test your function using the model from 4.7.10 b. (This needs to be an actual function using the function() command, not just a chunk of code). This will be something you will want to use throughout the semester, since we will be calculating these a lot! *Show the function code you wrote in your final write-up.*
+
+```{r, echo=TRUE}
+class.function <-
+  function(cutoff, probs, outcomes) {
+    results <- list()
+    predictions <- ifelse(probs > 0.5, 1, 0)
+    confusion.matrix <- table(outcomes, predictions)
+    names(dimnames(confusion.matrix)) <- c("Observed", "Predicted")
+    results$misclassification.rate <- 1- ((confusion.matrix[1,1] +
+                                              confusion.matrix[2,2])/(confusion.matrix[1,1] +                                                                    confusion.matrix[1,2]+confusion.matrix[2,1] +
+                                                                        confusion.matrix[2,2]))
+     
+     results$sensitivity <- confusion.matrix[2,2]/(confusion.matrix[2,2] + confusion.matrix[2,1])
+    results$specificity <- confusion.matrix[1,1]/(confusion.matrix[1,1] + confusion.matrix[1,2])
+    return(as.data.frame(results))
+  }
+
+class.function(0.5, Weekly.probs, Weekly$Direction)
+```

@@ -1,0 +1,622 @@
+---
+title: "Homework #4"
+author: "Justin Robinette"
+date: "February 5, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+# install.packages("MASS")
+# install.packages("class")
+# install.packages("data.table")
+library(ISLR)       #Weekly data set
+library(MASS)       #LDA and QDA
+library(class)      #KNN
+library(knitr)      #Kable
+library(data.table) #Data Manipulation
+library(dplyr)      #Data Manipulation
+library(ggplot2)    #Visualization
+library(GGally)     #Visualization
+```
+
+**Question 4.7.3, pg 168:** This problem relates to the QDA model, in which the observations within each class are drawn from a normal distribution with a class-specific mean vector and a class-specific covariance matrix. We conside the simple case where p = 1; i.e., there is only one feature.
+
+Suppose that we have K classes, and that if an observation belongs to the kth class then X comes from a one-dimensional normal distribution. X ~ N(\[\mu_k, \sigma^2_k\]). Recall that the density function for one-dimensional normal distribution is given in (4.11). Prove that in this case, the Bayes' classifier is not linear. Argue that it is in fact quadratic. 
+
+*Hint: For this problem, you should follow the arguments laid out in Section 4.4.2, but without making the assumption that \[\sigma^2_1 = ... = \sigma^2_k\].
+
+**Results:** 
+
+**Step 1 - starting from equation 4.12 on page 139 of the *ISLR:**
+\[p_k(x) = \frac {\pi_k \frac {1} {\sqrt{2 \pi} \sigma_k} \exp(- \frac {1} {2 \sigma_k^2} (x - \mu_k)^2) } {\sum { \pi_l \frac {1} {\sqrt{2 \pi} \sigma_k} \exp(- \frac {1} {2 \sigma_k^2} (x - \mu_l)^2) }}\]
+
+*The costant term that isn't variable by k:*
+\[Constant(c) = \frac { \frac {1} {\sqrt{2 \pi}}} {\sum { \pi_l \frac {1} {\sqrt{2 \pi} \sigma_k} \exp(- \frac {1} {2 \sigma_k^2} (x - \mu_l)^2) }}\]
+
+*Then the equation from 4.12 becomes:*
+\[p_k(x) = c \frac{\pi_k}{\sigma_k} \exp(- \frac {1} {2 \sigma_k^2} (x - \mu_k)^2)\]
+
+*Log of both sides:*
+\[log(p_k(x)) = log(c) + log(\pi_k) - log(\sigma_k) + (- \frac {1} {2 \sigma_k^2} (x - \mu_k)^2)\]
+
+*Simplify:*
+\[log(p_k(x)) = (- \frac {1} {2 \sigma_k^2} (x^2 + \mu_k^2 - 2x\mu_k)) + log(\pi_k) - log(\sigma_k) + log(C')\]
+
+**The \[x^2\] shows the quadratic**
+
+
+**Question 4.7.5, pg 169:** We now examine the differences between LDA and QDA.
+
+**Part A:** If the Bayes decision boundary is linear, do we expect LDA or QDA to perform better on the training set? On the test set?
+
+**Results:** If the Bayes decision boundary is linear, then the **LDA** would be expected to perform better on the test set and the **QDA** could overfit the training set. Because of this overfitting, the **QDA** would be expected to perform better on the training set. 
+
+**Part B:** If the Bayes decision boundary is non-linear, do we expect LDA or QDA to perform better on the training set? On the test set?
+
+**Results:** With the Bayes decision boundary being non-linear, I would expect the **QDA** to perform better on both the training and test data sets. 
+
+**Part C:** In general, as the sample size (*n*) increases, do we expect the test prediction accuracy of QDA relative to LDA to improve, decline, or be unchanged? Why?
+
+**Results:** This is discussed on page 150 of the *ISLR*, where it states that "**LDA** tends to be a better than **QDA** if there are relatively few training observations..." This is because you want to reduce the variance more if there are relatively few training observations. With a larger sample size, reducing the variance of the classifier is not as big of a concern. Because of this, I would expect the **QDA** to increase in prediction accuracy, relative to the **LDA**, as the sample size is increased. 
+
+**Part D:** True or False: Even if the Bayes decision boundary for a given problem is linear, we will probably achieve a superior test error rate using QDA rather than LDA because QDA is flexible enough to model a linear decision boundary. Justify your answer.
+
+**Results:** **FALSE** If the Bayes decision boundary is linear, than the **QDA** decision boundary is inferior, because there is a higher variance without corresponding decrease in bias. Although the QDA may perform better on the training set, it is likely to overfit and perform worse on the test data set. This is because the **QDA** is a more flexible method. 
+
+
+**Question 4.7.10, pg 171:** This question should be answered using the *Weekly* data set, which is part of the *ISLR* package. This data set is similar in nature to the *Smarket* data from this chapter's lab, except that it contains 1,089 weekly returns for 21 years, from the beginning of 1980 to the end of 2020.
+
+**Part E:** Repeat (d) using LDA.
+
+**Results:** First, I reloaded the data from the ISLR package. I subset into training and test just as I did in Homework 3. 
+
+Then, I used Linear Discriminant Analysis and only the **Lag2** variable as the predictor of **Direction**, just as we had done for part (d) of Homework 3. I used the training set to build the model. I then used this *LDA* model to predict the direction in the test data set and printed the confusion matrix and overall fraction of correct predictions, just as we had been instructed in part (d). I also included the percentage of accuracy for easier analysis. 
+
+The model predicted the test set correct 62.5% of the time. The sensitivity was (56/61 = 91.8%). The specificity was (9/43 = 20.9%).
+
+```{r}
+data("Weekly", package = "ISLR")
+# head(Weekly, 3)
+
+# subset into train and test sets (done in homework 3)
+Weekly.training <- subset(Weekly, Year < 2009)
+Weekly.test <- subset(Weekly, Year >= 2009)
+
+# fit model, per homework (done per instructions in Homework 3 part D)
+Weekly.lda <- lda(formula = Direction ~ Lag2, data = Weekly.training)
+Weekly.lda
+
+# create prediction factor for Direction from lda above
+lda.pred <- predict(Weekly.lda, Weekly.test)
+
+# print confusion matrix
+lda.confmatrix <- table(Weekly.test$Direction, lda.pred$class)
+names(dimnames(lda.confmatrix)) <- c("Observed", "Predicted")
+lda.confmatrix
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct LDA predictions
+lda.accuracy <- (lda.confmatrix[1,1] + lda.confmatrix[2,2])/sum(nrow(Weekly.test))*100
+paste("The percentage of accurate predictions in LDA test set is:",lda.accuracy)
+paste("The overall fraction of correct predictions in the LDA test set is:",
+      (lda.confmatrix[1,1]+lda.confmatrix[2,2]),"/",sum(nrow(Weekly.test)))
+```
+
+**Part F:** Repeat (d) using QDA
+
+**Results:** Here, I used Quadratic Discriminant Analysis using only the **Lag2** variable as the predictor of **Direction**, just as we had done for part (d) of Homework 3. I used the training set to build the model. I then used this *QDA* model to predict the direction in the test data set and printed the confusion matrix and overall fraction of correct predictions, just as we had been instructed in part (d). I also included the percentage of accuracy for easier analysis. 
+
+The model predicted the test set correct 62.5% of the time. The sensitivity was (61/61 = 100%). The specificity was (0/43 = 0%).
+
+```{r}
+# fit model, per homework (done per instructions in Homework 3 part D)
+Weekly.qda <- qda(formula = Direction ~ Lag2, data = Weekly.training)
+Weekly.qda
+
+# create prediction factor for Direction from lda above
+qda.pred <- predict(Weekly.qda, Weekly.test)
+
+# print confusion matrix
+qda.confmatrix <- table(Weekly.test$Direction, qda.pred$class)
+names(dimnames(qda.confmatrix)) <- c("Observed", "Predicted")
+qda.confmatrix
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+
+# print fraction of correct LDA predictions
+qda.accuracy <- (qda.confmatrix[1,1] + qda.confmatrix[2,2])/sum(nrow(Weekly.test))*100
+paste("The percentage of accurate predictions in QDA test set is:",round(qda.accuracy, 3),
+      "(rounded to 3 decimals")
+paste("The overall fraction of correct predictions in the QDA test set is:",
+      (qda.confmatrix[1,1]+qda.confmatrix[2,2]),"/",sum(nrow(Weekly.test)))
+```
+
+**Part G:** Repeat (d) using KNN with K = 1
+
+**Results:** I used the K-Nearest Neighbor Classification method here. I set a seed to create reproducibility. To fit the *knn()* function, I created matrices from training and test **Lag2** variables. I also created a 'direction' variable from the training Direction variable. 
+
+Per homework instructions, I printed the confusion matrix, the fraction of correct predictions and I also included the percentage correct for easier readability. This model only had a prediction accuracy of 50%. The sensitivity was (31/61 = 50.8%). The specificity was (21/43 = 48.8%).
+
+```{r}
+# set random seed for KNN
+set.seed(621)
+
+# get matrices of Lag2 and Direction variables
+Weekly.training.X <- as.matrix(Weekly.training$Lag2)
+Weekly.test.X <- as.matrix(Weekly.test$Lag2)
+Weekly.direction <- as.factor(Weekly.training$Direction)
+
+# use KNN to predict Direction
+Weekly.knn <- knn(Weekly.training.X, Weekly.test.X, Weekly.direction, k=1)
+
+# print confusion matrix
+knn.confmatrix <- table(Weekly.test$Direction, Weekly.knn)
+names(dimnames(knn.confmatrix)) <- c("Observed", "Predicted")
+knn.confmatrix
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct KNN predictions
+knn.accuracy <- (knn.confmatrix[1,1] + knn.confmatrix[2,2])/sum(nrow(Weekly.test))*100
+paste("The percentage of accurate predictions in KNN test set is:",knn.accuracy)
+paste("The overall fraction of correct predictions in the KNN test set is:",
+      (knn.confmatrix[1,1]+knn.confmatrix[2,2]),"/",sum(nrow(Weekly.test)))
+```
+
+**Part H:** Which of these methods appears to provide the best results on this data?
+
+**Results:** Using the training and test sets from the previous exercises and the Lag2 variable as the predictor (as instructed on the homework), we see that the GLM and LDA models perform the best at 62.5% accuracy on the test set. The QDA model is slightly lower at 58.65% and the KNN model with K=1 was only accurate 50% of the time. 
+
+```{r}
+### brought in from homework 3 part D to compare with Homework 4 models above ###
+# fit model, per homework
+Weekly.glm2 <- glm(formula = Direction ~ Lag2, data = Weekly.training, family = binomial)
+summary(Weekly.glm2)
+
+# create prediction factor for Direction from glm above
+test.probs <- predict(Weekly.glm2, Weekly.test, type = "response")
+test.pred <- as.factor(ifelse(test.probs > 0.5, "Up", "Down"))
+
+# join the predictions into test data set
+Weekly.test <- as.data.frame(cbind(Weekly.test, test.pred))
+
+# print confusion matrix
+confmatr2 <- table(Weekly.test$Direction, Weekly.test$test.pred)
+names(dimnames(confmatr2)) <- c("Observed", "Predicted")
+confmatr2
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct predictions
+glm.accuracy <- (confmatr2[1,1] + confmatr2[2,2])/sum(nrow(Weekly.test))*100
+
+kable(cbind(glm.accuracy, lda.accuracy, qda.accuracy, knn.accuracy), 
+      col.names = c("GLM Accuracy (%)", "LDA Accuracy (%)", "QDA Accuracy (%)", 
+                    "KNN Accuracy (%)"), caption = "Accuracy on Test Data Set by Method")
+```
+
+**Part I:** Experiment with different combinations of predictors including possible transformation and interactions, for each of the methods. Report the variables, method, and associated confusion matrix that appears to provide the best results on the held out data. Note that you should also experiment with values for K in the KNN classifier. 
+
+**Results:** Here I wanted to test a few things with the various models. First, I wanted to compare the performance of the original models from Part H with a model that uses a 2nd order polynomial (of Lag2) as the predictor. I compare each of the 3 models (GLM, LDA, and QDA) using this strategy. Only the QDA model was improved by introducing a 2nd order Polynomial of Lag2 - which is to be expected I supposed.
+
+I also wanted to compare the effectiveness of the KNN method on the data using various K values in my models. I tested KNNs equal to 1, 5, 10, 20, and 100. As we see below, the KNN of 20 performed the best, and all increases in K improved the model accuracy versus the K=1. 
+
+Lastly, I printed a table showing the accuracy, by model, in descending order. Both GLM models, the LDA model with the simple **Lag2** predictor, and the QDA model with the 2nd order polynomial were the best performers. The KNN models performed the worst, with the K=1 KNN model being the worst predictor of Direction. 
+
+```{r}
+# fit model with 2nd order polynomial
+Weekly.glm3 <- glm(formula = Direction ~ poly(Lag2, 2), 
+                   data = Weekly.training, family = binomial)
+
+# create prediction factor for Direction from glm above
+test.probs3 <- predict(Weekly.glm3, Weekly.test, type = "response")
+test.pred3 <- as.factor(ifelse(test.probs > 0.5, "Up", "Down"))
+
+# join the predictions into test data set
+Weekly.test <- as.data.frame(cbind(Weekly.test, test.pred3))
+
+# set up confusion matrix
+confmatr3 <- table(Weekly.test$Direction, Weekly.test$test.pred3)
+names(dimnames(confmatr3)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# get fraction of correct predictions
+glm.accuracy2 <- (confmatr3[1,1] + confmatr3[2,2])/sum(nrow(Weekly.test))*100
+
+# fit lda using technique above
+Weekly.lda2 <- lda(formula = Direction ~ poly(Lag2, 2), data = Weekly.training)
+
+# create prediction factor for Direction from lda above
+lda.pred2 <- predict(Weekly.lda2, Weekly.test)
+
+# set up confusion matrix
+lda.confmatrix2 <- table(Weekly.test$Direction, lda.pred2$class)
+names(dimnames(lda.confmatrix2)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# get fraction of correct LDA predictions
+lda.accuracy2 <- (lda.confmatrix2[1,1] + lda.confmatrix2[2,2])/sum(nrow(Weekly.test))*100
+
+# fit qda using technique above
+Weekly.qda2 <- qda(formula = Direction ~ poly(Lag2, 2), data = Weekly.training)
+
+# create prediction factor for Direction from lda above
+qda.pred2 <- predict(Weekly.qda2, Weekly.test)
+
+# set up confusion matrix
+qda.confmatrix2 <- table(Weekly.test$Direction, qda.pred2$class)
+names(dimnames(qda.confmatrix2)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# get fraction of correct QDA predictions
+qda.accuracy2 <- (qda.confmatrix2[1,1] + qda.confmatrix2[2,2])/sum(nrow(Weekly.test))*100
+
+kable(cbind(glm.accuracy, glm.accuracy2), col.names = c("Lag2", 
+                                                        "Lag2 2nd Order Polynomial"),
+      caption = "Accuracy (%) for GLM by Predictor")
+kable(cbind(lda.accuracy, lda.accuracy2), col.names = c("Lag2", 
+                                                        "Lag2 2nd Order Polynomial"),
+      caption = "Accuracy (%) for LDA by Predictor")
+kable(cbind(qda.accuracy, qda.accuracy2), col.names = c("Lag2", 
+                                                        "Lag2 2nd Order Polynomial"),
+      caption = "Accuracy (%) for QDA by Predictor")
+
+# analyze KNN accuracy with different K values
+# set random seed for KNN
+set.seed(621)
+
+# use KNN to predict Direction - k = 5
+Weekly.knn5 <- knn(Weekly.training.X, Weekly.test.X, Weekly.direction, k=5)
+
+# print confusion matrix
+knn.confmatrix5 <- table(Weekly.test$Direction, Weekly.knn5)
+names(dimnames(knn.confmatrix5)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct KNN predictions
+knn.accuracy5 <- (knn.confmatrix5[1,1] + knn.confmatrix5[2,2])/sum(nrow(Weekly.test))*100
+
+# use KNN to predict Direction - k = 10
+Weekly.knn10 <- knn(Weekly.training.X, Weekly.test.X, Weekly.direction, k=10)
+
+# print confusion matrix
+knn.confmatrix10 <- table(Weekly.test$Direction, Weekly.knn10)
+names(dimnames(knn.confmatrix10)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct KNN predictions
+knn.accuracy10 <- (knn.confmatrix10[1,1] + knn.confmatrix10[2,2])/sum(nrow(Weekly.test))*100
+
+# use KNN to predict Direction - k = 20
+Weekly.knn20 <- knn(Weekly.training.X, Weekly.test.X, Weekly.direction, k=20)
+
+# print confusion matrix
+knn.confmatrix20 <- table(Weekly.test$Direction, Weekly.knn20)
+names(dimnames(knn.confmatrix20)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct KNN predictions
+knn.accuracy20 <- (knn.confmatrix20[1,1] + knn.confmatrix20[2,2])/sum(nrow(Weekly.test))*100
+
+# use KNN to predict Direction - k = 100
+Weekly.knn100 <- knn(Weekly.training.X, Weekly.test.X, Weekly.direction, k=100)
+
+# print confusion matrix
+knn.confmatrix100 <- table(Weekly.test$Direction, Weekly.knn100)
+names(dimnames(knn.confmatrix100)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Weekly.test$Direction)
+
+# print fraction of correct LDA predictions
+knn.accuracy100 <- (knn.confmatrix100[1,1] + knn.confmatrix100[2,2])/sum(nrow(Weekly.test))*100
+
+# compare accuracy by K values
+kable(cbind(knn.accuracy, knn.accuracy5, knn.accuracy10, knn.accuracy20, knn.accuracy100),
+      col.names = c("K=1", "K=5", "K=10", "K=20", "K=100"),
+      caption = "Accuracy (%) of KNN Models with Different K Values")
+
+# compare all models
+model.comparison <- as.data.frame(rbind(glm.accuracy, glm.accuracy2, lda.accuracy, 
+                          lda.accuracy2, qda.accuracy, qda.accuracy2, knn.accuracy, 
+                          knn.accuracy5, knn.accuracy10, knn.accuracy20, knn.accuracy100))
+model.comparison <- setDT(model.comparison, keep.rownames = TRUE)
+colnames(model.comparison) <- c("Model", "AccuracyPercentage")
+# sort in descending order and fix model names
+model.comparison <- arrange(model.comparison, desc(AccuracyPercentage))
+model.comparison[1,1] <- "GLM w/ Lag2 as Predictor"
+model.comparison[2,1] <- "GLM w/ 2nd Order Polynomial (Lag2) as Predictor"
+model.comparison[3,1] <- "LDA w/ Lag2 as Predictor"
+model.comparison[4,1] <- "QDA w/ 2nd Order Polynomial (Lag2) as Predictor"
+model.comparison[5,1] <- "LDA w/ 2nd Order Polynomial (Lag2) as Predictor"
+model.comparison[6,1] <- "QDA w/ Lag2 as Predictor"
+model.comparison[7,1] <- "KNN w/ Lag2 as Predictor (k=20)"
+model.comparison[8,1] <- "KNN w/ Lag2 as Predictor (k=10)"
+model.comparison[9,1] <- "KNN w/ Lag2 as Predictor (k=100)"
+model.comparison[10,1] <- "KNN w/ Lag2 as Predictor (k=5)"
+model.comparison[11,1] <- "KNN w/ Lag2 as Predictor (k=1)"
+model.comparison
+```
+
+
+**Question 4.7.11, pg 172:** In this problem, you will develop a model to predict whether a given car gets high or low gas mileage based on the *Auto* data set.
+
+**Part D:** Perform LDA on the training data in order to predict **mpg01** using the variables that seemed most associated with **mpg01** in (b). What is the test error of the model obtained?
+
+**Results:** Based on last week's assignment, and the performance of my 2 GLMs, I included the following predictors: cylinders, weight, displacement, horsepower, and year. 
+
+Here I performed LDA with the training set and predicted the test set **mpg01** values. I printed a confusion matrix showing that the model is better at predicting when the mpg is greater than the median (47/48) than it is at predicting that an mpg is less than the median (42/50). In my opinion, both are very good rates of success though. The overall accuracy is nearly 91% and the fraction of accuracy is 89/98. The test error rate is 9.1837%.
+
+```{r}
+# load auto data set with changes from Assignment 3
+data("Auto", package = "ISLR")
+
+# create variable with conditions from exercise
+Auto$mpg01 <- as.factor(ifelse(Auto$mpg > median(Auto$mpg), 1, 0))
+Auto <- Auto %>% select(mpg01, everything())
+head(Auto, 3)
+
+# create a sample size of 75% of the sample
+sample.size <- (0.75 * nrow(Auto))
+
+# set seed for reproducibility
+set.seed(621)
+train_ind <- sample(seq_len(nrow(Auto)), size = sample.size)
+
+# split into train and test
+Auto.train <- Auto[train_ind, ]
+Auto.test <- Auto[-train_ind, ]
+
+# perform LDA using training data with variables from Homework 3
+Auto.lda <- lda(formula = mpg01 ~ cylinders + weight + displacement + horsepower + year,
+                 data = Auto.train)
+
+# create prediction factor from lda above
+Auto.lda.pred <- predict(Auto.lda, Auto.test)
+
+# print confusion matrix
+Auto.lda.confmatrix <- table(Auto.test$mpg01, Auto.lda.pred$class)
+names(dimnames(Auto.lda.confmatrix)) <- c("Observed", "Predicted")
+Auto.lda.confmatrix
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Auto.test$mpg01)
+
+# print accuracy rates of LDA
+Auto.lda.accuracy <- (Auto.lda.confmatrix[1,1] + Auto.lda.confmatrix[2,2])/sum(nrow(Auto.test))*100
+paste("The percentage of accurate predictions in LDA test set is:",round(Auto.lda.accuracy, 4))
+paste("The overall fraction of correct predictions in the LDA test set is:",
+      (Auto.lda.confmatrix[1,1]+Auto.lda.confmatrix[2,2]),"/",sum(nrow(Auto.test)))
+paste("The test error in the LDA test set is:", round((100-Auto.lda.accuracy),4),"%")
+```
+
+**Part E:** Perform QDA on the training data in order to predict **mpg01** using the variables that seemed most associated with **mpg01** in (b). What is the test error of the model obtained?
+
+**Results:** Based on last week's assignment, and the performance of my 2 GLMs, I included the following predictors: cylinders, weight, displacement, horsepower, and year. 
+
+Here I performed QDA with the training set and predicted the test set **mpg01** values. I printed a confusion matrix showing that the model is better at predicting when the mpg is greater than the median (46/48) than it is at predicting that an mpg is less than the median (44/50). In my opinion, both are very good rates of success though. The overall accuracy is over 91% and the fraction of accuracy is 90/98 (one better than with LDA). The test error rate is 8.1633%.
+
+```{r}
+# performed QDA, per homework 
+Auto.qda <- qda(formula = mpg01 ~ cylinders + weight + displacement + horsepower + year,
+                 data = Auto.train)
+
+# create prediction factor for mpg01 from qda above
+Auto.qda.pred <- predict(Auto.qda, Auto.test)
+
+# print confusion matrix
+Auto.qda.confmatrix <- table(Auto.test$mpg01, Auto.qda.pred$class)
+names(dimnames(Auto.qda.confmatrix)) <- c("Observed", "Predicted")
+Auto.qda.confmatrix
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Auto.test$mpg01)
+
+# print fraction of correct LDA predictions
+Auto.qda.accuracy <- (Auto.qda.confmatrix[1,1] + Auto.qda.confmatrix[2,2])/sum(nrow(Auto.test))*100
+paste("The percentage of accurate predictions in QDA test set is:",round(Auto.qda.accuracy, 4),
+      "(rounded to 4 decimals")
+paste("The overall fraction of correct predictions in the QDA test set is:",
+      (Auto.qda.confmatrix[1,1]+Auto.qda.confmatrix[2,2]),"/",sum(nrow(Auto.test)))
+paste("The test error in the QDA test set is:", round((100-Auto.qda.accuracy),4),"%")
+```
+
+**Part G:**Perform KNN on the training data, with several values of K, in order to predict **mpg01**. Use only the variables that seemed most associated with **mpg01** in (b). What test errors do you obtain? Which value of K seems to perform the best on this data set?
+
+**Results:** Based on last week's assignment, and the performance of my 2 GLMs, I included the following predictors: cylinders, weight, displacement, horsepower, and year. 
+
+Here I performed KNN with the training set and predicted the test set **mpg01** values. To do so, I created matrices of our predictor variables from the training and test sets. I then created a factor variable for mpg01 from training. 
+
+From here, I used KNN to predict **mpg01** - whether or not the miles per gallon of the automobile was greater than or less than the median. 
+
+Per the homework instructions, I utilized multiple k values (1, 5, 10, 20, 40, 60) to try and determine the best value for prediction rate. 
+
+As we see in the table below of error rates on the test data set, the best predicting models were the ones that utilized K values of 5, 40 and 60. Here, or test error rate is 10.2%. The model accuracy improves going from k=1 to k=5 and then performs worse going from k=5 to k=10. Then we receive our worst error rate going to k=20 (12.24%). The error rate from the k values tested then reverts back to our superior error rate also seen in k=5.
+
+```{r}
+# analyze KNN accuracy with different K values
+# set random seed for KNN
+set.seed(621)
+
+# get matrices of predictors and mpg01 variables
+Auto.training.X <- as.matrix(cbind(Auto.train$cylinders, Auto.train$weight, Auto.train$displacement,
+                         Auto.train$horsepower, Auto.train$year))
+Auto.test.X <- as.matrix(cbind(Auto.test$cylinders, Auto.test$weight, Auto.test$displacement,
+                         Auto.test$horsepower, Auto.test$year))
+Auto.mpg01 <- as.factor(Auto.train$mpg01)
+
+
+# use KNN to predict mpg01 - k = 1
+Auto.knn1 <- knn(Auto.training.X, Auto.test.X, Auto.mpg01, k=1)
+
+# set confusion matrix
+AutoKNN.confmatrix <- table(Auto.test$mpg01, Auto.knn1)
+names(dimnames(AutoKNN.confmatrix)) <- c("Observed", "Predicted")
+
+#### double check my observed and predicted columns are organized and labeled correctly ####
+# install.packages(plyr)
+# library(plyr)
+# count(Auto.test$mpg01)
+
+# get accuracy of k = 1
+AutoKNN.accuracy1 <- (AutoKNN.confmatrix[1,1] + AutoKNN.confmatrix[2,2])/sum(nrow(Auto.test))*100
+
+
+# use KNN to predict mpg01 - k = 5
+Auto.knn5 <- knn(Auto.training.X, Auto.test.X, Auto.mpg01, k=5)
+
+# set confusion matrix
+AutoKNN.confmatrix5 <- table(Auto.test$mpg01, Auto.knn5)
+names(dimnames(AutoKNN.confmatrix5)) <- c("Observed", "Predicted")
+
+
+# get accuracy of k = 5
+AutoKNN.accuracy5 <- (AutoKNN.confmatrix5[1,1] + AutoKNN.confmatrix5[2,2])/sum(nrow(Auto.test))*100
+
+
+# use KNN to predict mpg01 - k = 10
+Auto.knn10 <- knn(Auto.training.X, Auto.test.X, Auto.mpg01, k=10)
+
+# set confusion matrix
+AutoKNN.confmatrix10 <- table(Auto.test$mpg01, Auto.knn10)
+names(dimnames(AutoKNN.confmatrix10)) <- c("Observed", "Predicted")
+
+# get accuracy of k = 10
+AutoKNN.accuracy10 <- (AutoKNN.confmatrix10[1,1] + AutoKNN.confmatrix10[2,2])/sum(nrow(Auto.test))*100
+
+
+# use KNN to predict mpg01 - k = 20
+Auto.knn20 <- knn(Auto.training.X, Auto.test.X, Auto.mpg01, k=20)
+
+# set confusion matrix
+AutoKNN.confmatrix20 <- table(Auto.test$mpg01, Auto.knn20)
+names(dimnames(AutoKNN.confmatrix20)) <- c("Observed", "Predicted")
+
+
+# get accuracy of k = 20
+AutoKNN.accuracy20 <- (AutoKNN.confmatrix20[1,1] + AutoKNN.confmatrix20[2,2])/sum(nrow(Auto.test))*100
+
+
+# use KNN to predict mpg01 - k = 40
+Auto.knn40 <- knn(Auto.training.X, Auto.test.X, Auto.mpg01, k=40)
+
+# set confusion matrix
+AutoKNN.confmatrix40 <- table(Auto.test$mpg01, Auto.knn40)
+names(dimnames(AutoKNN.confmatrix40)) <- c("Observed", "Predicted")
+
+# get accuracy of k = 40
+AutoKNN.accuracy40 <- (AutoKNN.confmatrix40[1,1] + AutoKNN.confmatrix40[2,2])/sum(nrow(Auto.test))*100
+
+
+# use KNN to predict mpg01 - k = 60
+Auto.knn60 <- knn(Auto.training.X, Auto.test.X, Auto.mpg01, k=60)
+
+# set confusion matrix
+AutoKNN.confmatrix60 <- table(Auto.test$mpg01, Auto.knn60)
+names(dimnames(AutoKNN.confmatrix60)) <- c("Observed", "Predicted")
+
+# get accuracy of k = 60
+AutoKNN.accuracy60 <- (AutoKNN.confmatrix60[1,1] + AutoKNN.confmatrix60[2,2])/sum(nrow(Auto.test))*100
+
+
+# compare errors by K values
+kable(cbind(100-AutoKNN.accuracy1, 100-AutoKNN.accuracy5, 100-AutoKNN.accuracy10, 100-AutoKNN.accuracy20,
+            100-AutoKNN.accuracy40, 100-AutoKNN.accuracy60),
+      col.names = c("K=1", "K=5", "K=10", "K=20", "K=40", "K=60"),
+      caption = "Test Error (%) of KNN Models with Different K Values")
+```
+
+
+**Question 5:** Read the paper "Statistical Classification Methods in Consumer Credit Scoring: A Review" posted on D2L. Write a one page (no more, no less) summary.
+
+**Results:** Credit, as defined by this paper, refers to "an amount of money that is loaned to a consumer by a financial institution which must be repaid." The goal of this paper is to look at credit scoring methods, limitations that exist among the methods as well as in the process as a whole, and discuss some areas that cause additional difficulty in the scoring process.
+
+The paper mentions the voluminous data that exists in credit scoring databases. Well over 100,000 applicants with more than 100 predictor variables is quite common. Furthermore, when a database is used for behavioral scoring, which focuses on past repayment behavior, the paper mentions that these databases can be much larger. Some of the more typical predictor variables include: time at current residence, home status (owner, rent, etc), postcode, telephone, annual income, age, court judgments against the applicant, marital status, and others. 
+
+When working with so many independent variables, and such large amounts of data, missing values are common. This makes the variable selection process even more challenging. Theoretically, three approaches are discussed for variable selection: the use of expert knowledge and experience, stepwise approaches, and information value of the variable. In practice, however, all three approaches are typically used, as the paper explains. 
+
+Some statistically scoring methods used in credit scoring mentioned are: discriminant analysis, linear regression, logistic regression, mathematical programming methods, recursive partitioning, expert systems, neural networks, smoothing nonparametric methods, and time varying models. Despite the many tools available for statistically scoring credit applicants, there is no overall "best" method, according to the paper. 
+
+The data structure, predictors used, and our ability to separate applicants into classes using those predictors helps to determine the best method. Additionally, figuring out what classification rate is to be used to determine best model can change our determination of the best model. Overall misclassification rate might be good, but if your model is very good at predicting if someone with not default, but less successful at figuring out those who will default, this could be very costly to the organization. 
+
+Another consideration is the overall speed of classification for purposes of issuing a decision. Being able to offer an instant decision is much more appealing to a borrow - especially, I would suspect, those borrowers that can get quick decisions elsewhere. Neural networks are good for credit situations where there is not as much understanding of the data structure. Classification methods are easier to understand and much more appealing to the organization and to the borrowers. They make it easier for the organization to explain their decision to the borrower.
+
+There are also other issues that must be considered in the process. One is the legality that plays a role in credit decisions. Legislation prevents the use of certain characteristics playing a role in the process - whether or not those characteristics would make the decisions more accurate. Additionally, how credit limits play a role in the modeling of statistical methods can complicate the process. Figuring out what interest rate to charge borrowers in order for the company lending the credit to be profitable is another factor. When do we act on delinquent loans? Is it even worthwhile to do so? These are other factors. 
+
+The paper asks some very good questions and presents some very useful explanations of how statistics plays a role in the credit decision making process. The methods described are important, but as the paper mentions, improvements in this process will likely be a product of gaining a better understanding of the other issues discussed in the previous paragraph. 
+
+
+**Question 6:** Explore this website (https://archive.ics.uci.edu/ml/datasets.html) that contains open data sets that are used in machine learning. Find one data set with a classification problem and write a description of the dataset and problem. I don't expect you to do the analysis for this homework, but feel free to if you want! 
+
+**Results:** I chose the credit-screening data set from the website above. (https://archive.ics.uci.edu/ml/datasets/Credit+Approval). This data set concerns credit card applications, as the website says. Looking at the summary below, we can see that there are some missing values that may require imputation. These are denoted by **?** in the dat aset. A1, for example, has 12 missing, or **?** values. 
+
+The dependent variable is the factor **A16**. A '+' indicates approval where as a '-' indicates a decline on the credit application.
+
+What I found most intriguing about this data set was that the variable names have been removed to protect the confidentiality of the applicants. I had not though about the reality that this is probably done frequently in some industries - healthcare and finance being two that I am very interested in. I think this, on the surface, makes the data seem more "daunting". In reality though, I think it could be useful in removing biases that we have. One binary factor independent variable, for example, is **A9**. It lists a 't' and an 'f'. Maybe that variable actually represents "College Student", "Previous Bankruptcy", "Income > 150k", etc. This would inherently bias my initial exploration. 
+
+My first step in working with this data set would be to attempt to impute values based on the other values in the variable. In doing so, I would change all '?' values to 'NA'. Next I would begin the imputation process and determine if any observations should be removed (too many NAs, for example). Then I could begin the process of looking for correlations and building models. 
+
+```{r}
+# load credit screening data set
+credit.screening <- read.table("credit-screening.data", sep = ",")
+
+# add column names
+colnames(credit.screening) <- c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11",
+                                "A12", "A13", "A14", "A15", "A16")
+
+# print header and summary
+head(credit.screening, 3)
+summary(credit.screening)
+```

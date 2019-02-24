@@ -1,0 +1,685 @@
+---
+title: "Homework #5"
+author: "Justin Robinette"
+date: "February 19, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+library(ISLR)       #datasets
+library(mclust)     #mclustda discriminant analysis
+library(knitr)      #kable functionality
+library(MASS)       #LDA and QDA
+library(class)      #KNN
+library(data.table) #data manipulation
+library(dplyr)      #data manipulation
+library(ggplot2)    #visualization
+library(gridExtra)  #visualization
+library(GGally)     #visualization
+```
+
+**Question 4.7.6, pg 170:** Suppose we collect data for a group of students in a statistics class with variables **X1 = Hours Studied**, **X2 = Undergrad GPA**, and **Y = Receive an A**. We fit a logistic regression and produce estimated coefficient, \[\beta_0 = -6\], \[\beta_1 = 0.05\] and \[\beta_2 = 1\]
+
+**Part A:** Estimate the probability that a student who studies for 40h and has an undergrad GPA of 3.5 gets an A in this class.
+
+**Results:** 
+The probability can be calculated as:
+\[p(x) = \frac{e^{\beta_0+\beta_1 X_1+\beta_2 X_2}}{1+e^{\beta_0+\beta_1 X_1+\beta_2 X_2}}\]
+
+Plug in the beta values:
+\[p(X) = \frac{e^{-6 + 0.05 \times 40 + 1 \times 3.5}}{1+e^{-6+0.05 \times 40 + 1 \times 3.5}}\]
+
+Solve:
+```{r, echo=TRUE}
+solution <- exp(-6+0.05*40+1*3.5)/(1+exp(-6+0.05*40+1*3.5))
+paste("The probability that this student would receive an A in the class is:",round(solution,5))
+```
+
+**Part B:** How many hours would the student in *Part A* need to study to have a 50% chance of getting an A in the class?
+
+**Results:**
+Set the equation equal to 0.5:
+\[0.5 = \frac{e^{-6 + 0.05 \times 40 + 1 \times 3.5}}{1+e^{-6+0.05 \times 40 + 1 \times 3.5}}\]
+
+Which becomes equal to:
+\[log(\frac{0.5}{1-0.5}) = -6 + 0.05 X_1 + 1 \times 3.5\]
+
+Solve:
+```{r, echo=TRUE}
+solution <- (log(0.5/(1-0.5)) + 6 - 3.5*1)/0.05
+paste("In order to have a .5 probability of getting an A, the student would need to study",solution,"hours.")
+```
+
+**Question 4.7.7, pg 170:** Suppose that we wish to predict whether a given stock will issue a dividend this year ("Yes" or "No") based on *X*, which equals last year's percent profit. We examine a large number of companies and discover that the mean value of *X* for companies that issued a dividend was **X = 10**, while the mean for those that didn't was **X = 0**. In addition, the variance of *X* for these two sets of companies was \[\sigma^2 = 36\]. Finally, 80% of companies issued dividends. Assuming that *X* follows a normal distribution, predict the probability that a company will issue a dividend this year given that its percentage profit was **X = 4** last year.
+
+*Hint: Recall that the density function for a normal random variable is:* \[f(x) = \frac{1}{\sqrt(2\pi\sigma^2)}e^{-(x-\mu)^2/2\sigma^2}\]*. You will need to use the Bayes' theorem.*
+
+**Results:** 
+\[p(4) = \frac{0.8e^{-(1/72)(4-10)^2}}{0.8e^{-(1/72)(4-10)^2}+0.2e^{-(1/72)(4-0)^2}}\]
+
+Solve
+```{r, echo=TRUE}
+solution <- (0.8*exp(-1/(2*36)*(4-10)^2))/(0.8*exp(-1/(2*36)*(4-10)^2)+(1-0.8)*exp(-1/(2*36)*(4-0)^2))
+paste("The probability that this company will issue a dividend this year is",round(solution,5))
+```
+
+**Exercise #3:** Continue Homeworks 3 & 4 using the **Weekly** dataset from 4.7.10. Fit a model (using the predictors chosen from previous homework) for classification using MclustDA function from the mclust-package. 
+
+**i:** Do a summary of your model. 
+
+- What is the best model selected by BIC? Report the Model Name and the BIC.(https://www.rdocumentation.org/packages/mclust/versions/5.4/topics/mclustModelNames)
+
+- What is the training error? What is the test error?
+
+- Report the True Positive Rate and the True Negative Rate.
+
+**Results:** Here, I loaded the dataset and split into training and test, as we've done in the prior assignments. I also used the same predictor as I did in previous assignments which is **Lag2**. I then used MclustDA and reported the best model*(V - univariate, variable variance)* and it's BIC *(-4,327.8)*, according to the entire summary. 
+
+Then I used this model to predict the Weekly test data set **Direction**. I reported both the training *(0.4416244)* and test error *(0.4519231)* rates as well as the True Positive *(85.2459%)* and True Negative *(11.62791%)* rates on the test set. These are summarized in tables below and will be used for future comparisons. 
+
+```{r}
+data("Weekly", package = "ISLR")
+# head(Weekly, 3)
+
+# subset into train and test sets (done in homework 3)
+Weekly.training <- subset(Weekly, Year < 2009)
+Weekly.test <- subset(Weekly, Year >= 2009)
+
+# fit MclustDA
+Weekly.MclustDA <- MclustDA(Weekly.training$Lag2, class = Weekly.training$Direction)
+
+# get summary
+# first print entire summary for model type info
+summary(Weekly.MclustDA)
+Weekly.MclustDA.sum <- summary(Weekly.MclustDA, parameters = TRUE, what = "classification",
+                               newdata = Weekly.test$Lag2, newclass = Weekly.test$Direction)
+
+# report best model
+kable(cbind(mclustModelNames("V"), Weekly.MclustDA.sum$bic), 
+      col.names = c("Best Model & Type", "BIC"), caption = "Best Model Selected by BIC")
+
+# report errors
+kable(cbind(Weekly.MclustDA.sum$err, Weekly.MclustDA.sum$err.newdata), 
+      col.names = c("Training Error", "Test Error"), 
+      caption = "Training and Test Error of Best Model")
+
+# get accuracy for comparison
+MclustDA.accuracy <- (1 - Weekly.MclustDA.sum$err.newdata)*100
+
+# get True Positive and True Negative rates
+Weekly.true.positive <- (Weekly.MclustDA.sum$tab.newdata[2,2]/
+  (Weekly.MclustDA.sum$tab.newdata[2,1]+Weekly.MclustDA.sum$tab.newdata[2,2]))*100
+Weekly.true.negative <- (Weekly.MclustDA.sum$tab.newdata[1,1]/
+  (Weekly.MclustDA.sum$tab.newdata[1,2]+Weekly.MclustDA.sum$tab.newdata[1,1]))*100
+kable(cbind(Weekly.true.positive, Weekly.true.negative), 
+      col.names = c("True Positive (%)", "True Negative (%)"),
+      caption = "True Positive/Negative Rates on Test Data")
+```
+
+**ii:** Specify modelType = "EDDA" and run MclustDA again. Do a summary of your model.
+
+- What is the best model by BIC?
+
+- Find the training and test error rates.
+
+- Report the True Positive and True Negative Rate.
+
+**Results:** For this exercise, I also used the same predictor as I did in previous assignments which is **Lag2**. I then used EDDA as my *modelType* in the MclustDA function and reported the best model*(E - univariate, equal variance)* and it's BIC *(-4,429.2)*, according to the entire summary. 
+
+Then I used this model to predict the Weekly test data set **Direction**. I reported both the training *(0.4456853)* and test error *(0.375)* rates as well as the True Positive *(91.80328%)* and True Negative *(20.93023%)* rates on the test set. These are summarized in tables below and will be used for future comparisons. 
+
+```{r}
+# fit MclustDA w/ EDDA
+Weekly.EDDA <- MclustDA(Weekly.training$Lag2, class = Weekly.training$Direction,
+                            modelType = "EDDA")
+
+# get summary
+# first print entire summary for model type info
+summary(Weekly.EDDA)
+Weekly.EDDA.sum <- summary(Weekly.EDDA, parameters = TRUE, what = "classification",
+                               newdata = Weekly.test$Lag2, newclass = Weekly.test$Direction)
+
+# report best model
+kable(cbind(mclustModelNames("E"), Weekly.EDDA.sum$bic), 
+      col.names = c("Best Model & Type", "BIC"), caption = "Best Model Selected by BIC")
+
+# report errors
+kable(cbind(Weekly.EDDA.sum$err, Weekly.EDDA.sum$err.newdata), 
+      col.names = c("Training Error", "Test Error"), 
+      caption = "Training and Test Error of Best Model")
+
+# get accuracy for comparison
+EDDA.accuracy <- (1 - Weekly.EDDA.sum$err.newdata)*100
+
+# get True Positive and True Negative rates
+EDDA.true.positive <- (Weekly.EDDA.sum$tab.newdata[2,2]/
+  (Weekly.EDDA.sum$tab.newdata[2,1]+Weekly.EDDA.sum$tab.newdata[2,2]))*100
+EDDA.true.negative <- (Weekly.EDDA.sum$tab.newdata[1,1]/
+  (Weekly.EDDA.sum$tab.newdata[1,2]+Weekly.EDDA.sum$tab.newdata[1,1]))*100
+kable(cbind(EDDA.true.positive, EDDA.true.negative), 
+      col.names = c("True Positive (%)", "True Negative (%)"),
+      caption = "True Positive/Negative Rates on Test Data")
+```
+
+**iii:** Compare the results with Homeworks 3 & 4. Which method performed the best? Justify your answer. *Here you need to list the previous methods and their corresponding rates.*
+
+**Results:** First I brought in my code from assignments 3 & 4 to derive the previously reported accuracies. Then, I printed a table comparing the GLM, LDA, QDA, KNN, MclustDA, and EDDA methods. The best performing methods are the GLM, LDA and EDDA methods, all coming in at an accuracy rate of **62.5%**. 
+
+To attempt to differentiate between the models to select a "best" model, I compared the True Positive and True Negative rates of the 3 models. Here, as can be seen in the table printed below, the models perform equally well in both categories. 
+
+Based on this, I would conclude, for this data set, the 3 models can be seen as equally successful given the training and test set breakdowns we were asked to use. 
+
+```{r}
+# set random seed for KNN
+set.seed(621)
+
+######### bringing in models from Homeworks 3 and 4 ##########
+
+### brought in from homework 3 part D to compare with Homework 4 models above ###
+# fit model, per homework
+Weekly.glm2 <- glm(formula = Direction ~ Lag2, data = Weekly.training, family = binomial)
+
+# create prediction factor for Direction from glm above
+test.probs <- predict(Weekly.glm2, Weekly.test, type = "response")
+test.pred <- as.factor(ifelse(test.probs > 0.5, "Up", "Down"))
+
+# join the predictions into test data set
+Weekly.test <- as.data.frame(cbind(Weekly.test, test.pred))
+
+# print confusion matrix
+confmatr2 <- table(Weekly.test$Direction, Weekly.test$test.pred)
+names(dimnames(confmatr2)) <- c("Observed", "Predicted")
+
+# print fraction of correct predictions
+glm.accuracy <- (confmatr2[1,1] + confmatr2[2,2])/sum(nrow(Weekly.test))*100
+
+
+## lda ##
+# fit model, per homework (done per instructions in Homework 3 part D)
+Weekly.lda <- lda(formula = Direction ~ Lag2, data = Weekly.training)
+
+# create prediction factor for Direction from lda above
+lda.pred <- predict(Weekly.lda, Weekly.test)
+
+# get confusion matrix
+lda.confmatrix <- table(Weekly.test$Direction, lda.pred$class)
+names(dimnames(lda.confmatrix)) <- c("Observed", "Predicted")
+
+# get lda accuracy
+lda.accuracy <- (lda.confmatrix[1,1] + lda.confmatrix[2,2])/sum(nrow(Weekly.test))*100
+
+
+## qda ##
+# fit model, per homework (done per instructions in Homework 3 part D)
+Weekly.qda <- qda(formula = Direction ~ Lag2, data = Weekly.training)
+
+# create prediction factor for Direction from lda above
+qda.pred <- predict(Weekly.qda, Weekly.test)
+
+# get confusion matrix
+qda.confmatrix <- table(Weekly.test$Direction, qda.pred$class)
+names(dimnames(qda.confmatrix)) <- c("Observed", "Predicted")
+
+# get qda accuracy
+qda.accuracy <- (qda.confmatrix[1,1] + qda.confmatrix[2,2])/sum(nrow(Weekly.test))*100
+
+
+## knn ##
+# get matrices of Lag2 and Direction variables
+Weekly.training.X <- as.matrix(Weekly.training$Lag2)
+Weekly.test.X <- as.matrix(Weekly.test$Lag2)
+Weekly.direction <- as.factor(Weekly.training$Direction)
+
+# use KNN to predict Direction
+Weekly.knn <- knn(Weekly.training.X, Weekly.test.X, Weekly.direction, k=1)
+
+# get confusion matrix
+knn.confmatrix <- table(Weekly.test$Direction, Weekly.knn)
+names(dimnames(knn.confmatrix)) <- c("Observed", "Predicted")
+
+# get knn accuracy
+knn.accuracy <- (knn.confmatrix[1,1] + knn.confmatrix[2,2])/sum(nrow(Weekly.test))*100
+
+
+# print accuracy comparison of all models
+kable(cbind(glm.accuracy, lda.accuracy, qda.accuracy, knn.accuracy, 
+            MclustDA.accuracy, EDDA.accuracy), 
+      col.names = c("GLM Accuracy (%)", "LDA Accuracy (%)", "QDA Accuracy (%)", 
+                    "KNN Accuracy (%)", "MclustDA Accuracy (%)", "EDDA Accuracy (%)"), 
+      caption = "Accuracy on Test Data Set by Method")
+
+# compare True Positive and True Negative Rates for top 3 performing models
+glm.true.positive <- (confmatr2[2,2]/(confmatr2[2,1]+confmatr2[2,2]))*100
+glm.true.negative <- (confmatr2[1,1]/(confmatr2[1,2]+confmatr2[1,1]))*100
+lda.true.positive <- (lda.confmatrix[2,2]/(lda.confmatrix[2,1]+lda.confmatrix[2,2]))*100
+lda.true.negative <- (lda.confmatrix[1,1]/(lda.confmatrix[1,2]+lda.confmatrix[1,1]))*100
+
+
+# present true positive and true negative values as data table for comparison
+true.posneg.comp <- as.data.frame(rbind(glm.true.positive, glm.true.negative, 
+                                        lda.true.positive, lda.true.negative,
+                                        EDDA.true.positive, EDDA.true.negative))
+
+setDT(true.posneg.comp, keep.rownames = TRUE)
+colnames(true.posneg.comp) <- c("Model Measure", "Accuracy %")
+true.posneg.comp
+```
+
+**Exercise #4:** Continue from Homeworks 3 & 4 using the **Auto** dataset from 4.7.11. Fit a classification model (using the predictors chosen for previous homework) using MclustDA function from the mclust-package. Use the same training and test set from previous homework assignments. 
+
+**i:** Do a summary of your model.
+
+- What is the best model selected by BIC? Report the model name and BIC.
+
+- What is the training error? What is the test error?
+
+- Report the True Positive Rate and the True Negative Rate.
+
+**Results:** Here, I loaded the dataset and split into training and test - removing the predictors that have not been used on previous assignments. I used the same predictors as I did in previous assignments. These are *cylinders*, *weight*, *displacement*, *horsepower*, and *year*. I then used MclustDA and reported the best model*(EEV - ellipsoidal, equal volume and shape)* and it's BIC *(-10847.8)*, according to the entire summary. 
+
+Then I used this model to predict the Weekly test data set **mpg01**. I reported both the training *(0.0544218)* and test error *(0.0816327)* rates as well as the True Positive *(93.75%)* and True Negative *(90%)* rates on the test set. These are summarized in tables below and will be used for future comparisons. 
+
+```{r}
+# load auto data set with changes from Assignment 3
+data("Auto", package = "ISLR")
+
+# create variable with conditions from exercise and create new data frame with only predictors from prior assignments
+Auto$mpg01 <- as.factor(ifelse(Auto$mpg > median(Auto$mpg), 1, 0))
+Auto <- Auto %>% select(mpg01, everything())
+Auto.dat <-
+  Auto[, names(Auto) %in% c("mpg01", "cylinders", "weight", "displacement", "horsepower", "year")]
+
+# create a sample size of 75% of the sample
+sample.size <- (0.75 * nrow(Auto.dat))
+
+# set seed for reproducibility
+set.seed(621)
+train_ind <- sample(seq_len(nrow(Auto.dat)), size = sample.size)
+
+# split into train and test
+Auto.train <- Auto.dat[train_ind, ]
+Auto.test <- Auto.dat[-train_ind, ]
+
+# fit MclustDA
+Auto.MclustDA <- MclustDA(Auto.train[,2:6], class = Auto.train$mpg01, G = 1:9)
+
+
+# get summary
+# print entire summary for model type info
+summary(Auto.MclustDA)
+Auto.MclustDA.sum <- summary(Auto.MclustDA, parameters = TRUE, what = "classification",
+                             newdata = Auto.test[,2:6], newclass = Auto.test$mpg01)
+
+# report best model
+kable(cbind(mclustModelNames("EEV"), Auto.MclustDA.sum$bic),
+      col.names = c("Best Model & Type", "BIC"), caption = "Best Model Selected by BIC")
+
+# report error rates
+kable(cbind(Auto.MclustDA.sum$err, Auto.MclustDA.sum$err.newdata),
+      col.names = c("Training Error", "Test Error"), 
+      caption = "Training and Test Error of Best Model")
+
+# get accuracy for comparison
+Auto.MclustDA.accuracy <- (1 - Auto.MclustDA.sum$err.newdata)*100
+
+# get True Positive and True Negative rates
+Auto.MclustDA.true.positive <- (Auto.MclustDA.sum$tab.newdata[2,2]/
+                                (Auto.MclustDA.sum$tab.newdata[2,1]+
+                                  Auto.MclustDA.sum$tab.newdata[2,2]))*100
+Auto.MclustDA.true.negative <- (Auto.MclustDA.sum$tab.newdata[1,1]/
+                                  (Auto.MclustDA.sum$tab.newdata[1,2]+
+                                  Auto.MclustDA.sum$tab.newdata[1,1]))*100
+kable(cbind(Auto.MclustDA.true.positive, Auto.MclustDA.true.negative),
+      col.names = c("True Positive (%)", "True Negative (%)"),
+      caption = "True Positive/Negative Rates on Test Data")
+```
+
+**ii:** Specify modelType = "EDDA" and run the MclustDA again. Do a summary of your model.
+
+- What is the best model selected by BIC?
+
+- Find the training and test error rates.
+
+- Report the True Positive and True Negative Rate.
+
+**Results:** Here, I used the same predictors as I did in previous assignments. These are *cylinders*, *weight*, *displacement*, *horsepower*, and *year*. I then used **EDDA** modelType from the Mclust function and reported the best model*(VVV - ellipsoidal, varying volume, shape, and orientation)* and it's BIC *(-12129.9)*, according to the entire summary. 
+
+Then I used this model to predict the Weekly test data set **mpg01**. I reported both the training *(0.1054422)* and test error *(0.0816327)* rates as well as the True Positive *(95.83333%)* and True Negative *(88%)* rates on the test set. These are summarized in tables below and will be used for future comparisons. 
+
+```{r}
+# fit MclustDA w/ EDDA
+Auto.EDDA <- MclustDA(Auto.train[,2:6], class = Auto.train$mpg01,
+                      modelType = "EDDA")
+
+# get summary
+# first print entire summary for model type info
+summary(Auto.EDDA)
+Auto.EDDA.sum <- summary(Auto.EDDA, parameters = TRUE, what = "classification",
+                         newdata = Auto.test[,2:6], newclass = Auto.test$mpg01)
+
+# report best model
+kable(cbind(mclustModelNames("VVV"), Auto.EDDA.sum$bic),
+      col.names = c("Best Model & Type", "BIC"), caption = "Best Model Selected by BIC")
+
+# report errors
+kable(cbind(Auto.EDDA.sum$err, Auto.EDDA.sum$err.newdata),
+      col.names = c("Training Error", "Test Error"), 
+      caption = "Training and Test Error of Best Model")
+
+# get accuracy for comparison
+Auto.EDDA.accuracy <- (1 - Auto.EDDA.sum$err.newdata)*100
+
+# get True Positive and True Negative rates
+Auto.EDDA.true.positive <- (Auto.EDDA.sum$tab.newdata[2,2]/
+  (Auto.EDDA.sum$tab.newdata[2,1]+Auto.EDDA.sum$tab.newdata[2,2]))*100
+Auto.EDDA.true.negative <- (Auto.EDDA.sum$tab.newdata[1,1]/
+  (Auto.EDDA.sum$tab.newdata[1,2]+Auto.EDDA.sum$tab.newdata[1,1]))*100
+kable(cbind(Auto.EDDA.true.positive, Auto.EDDA.true.negative), 
+      col.names = c("True Positive (%)", "True Negative (%)"),
+      caption = "True Positive/Negative Rates on Test Data")
+```
+
+**iii:** Compare the results with Homeworks 3 & 4. Which method performed the best? Justify your answer. *Here you need to list the previous methods and their corresponding rates.*
+
+**Results:** First I brought in my code from assignments 3 & 4 to derive the previously reported accuracies. Then, I printed a table comparing the GLM, LDA, QDA, KNN, MclustDA, and EDDA methods. I used the KNN with K=5 from Assignment 4 because that was the best performing KNN model. The best performing method is the Generalized Linear Model with an accuracy of **92.85714%**. The QDA, MclustDA and EDDA models are the next best performing models at **91.83673**. As with the last assignment, the QDA is slightly better than the LDA for this data set and the KNN method was least successful in predicting **mpg01**.
+
+Based on the table presented below, I can conclude that, for this data set, the Generalized Linear Model is superior. 
+
+```{r}
+# set random seed for KNN
+set.seed(621)
+
+######### bringing in models from Homeworks 3 and 4 ##########
+## glm ##
+Auto.glm <- glm(formula = mpg01 ~ cylinders + weight + displacement + horsepower + year,
+                 data = Auto.train, family = binomial)
+
+# create prediction factor for models
+test1.probs <- predict(Auto.glm, Auto.test, type = "response")
+test1.pred <- as.factor(ifelse(test1.probs > 0.5, 1, 0))
+# print confusion matrix
+auto.confmatr1 <- table(Auto.test$mpg01, test1.pred)
+names(dimnames(auto.confmatr1)) <- c("Observed", "Predicted")
+
+# get glm accuracy
+Auto.glm.accuracy <- (auto.confmatr1[1,1] + 
+                      auto.confmatr1[2,2])/sum(nrow(Auto.test))*100
+
+## lda ##
+# perform LDA using training data with variables from Homework 3
+Auto.lda <- lda(formula = mpg01 ~ cylinders + weight + displacement + horsepower + year,
+                 data = Auto.train)
+
+# create prediction factor from lda above
+Auto.lda.pred <- predict(Auto.lda, Auto.test)
+
+# get confusion matrix
+Auto.lda.confmatrix <- table(Auto.test$mpg01, Auto.lda.pred$class)
+names(dimnames(Auto.lda.confmatrix)) <- c("Observed", "Predicted")
+
+# get lda accuracy
+Auto.lda.accuracy <- (Auto.lda.confmatrix[1,1] +
+                           Auto.lda.confmatrix[2,2])/sum(nrow(Auto.test))*100
+
+
+## qda ##
+# performed QDA, per homework 
+Auto.qda <- qda(formula = mpg01 ~ cylinders + weight + displacement + horsepower + year,
+                 data = Auto.train)
+
+# create prediction factor for mpg01 from qda above
+Auto.qda.pred <- predict(Auto.qda, Auto.test)
+
+# get confusion matrix
+Auto.qda.confmatrix <- table(Auto.test$mpg01, Auto.qda.pred$class)
+names(dimnames(Auto.qda.confmatrix)) <- c("Observed", "Predicted")
+
+# get qda accuracy
+Auto.qda.accuracy <- (Auto.qda.confmatrix[1,1] +
+                           Auto.qda.confmatrix[2,2])/sum(nrow(Auto.test))*100
+
+
+## knn ##
+# get matrices of predictors and mpg01 variables
+Auto.training.X <- as.matrix(Auto.train)
+Auto.test.X <- as.matrix(Auto.test)
+Auto.mpg01 <- as.factor(Auto.train$mpg01)
+
+# use KNN to predict mpg01 - k = 5
+Auto.knn5 <- knn(Auto.training.X, Auto.test.X, Auto.mpg01, k=5)
+
+# set confusion matrix
+AutoKNN.confmatrix5 <- table(Auto.test$mpg01, Auto.knn5)
+names(dimnames(AutoKNN.confmatrix5)) <- c("Observed", "Predicted")
+
+# get accuracy of k = 5
+AutoKNN.accuracy5 <- (AutoKNN.confmatrix5[1,1] +
+                           AutoKNN.confmatrix5[2,2])/sum(nrow(Auto.test))*100
+
+# print accuracy comparison of all models
+kable(cbind(Auto.glm.accuracy, Auto.lda.accuracy, Auto.qda.accuracy,
+            AutoKNN.accuracy5, Auto.MclustDA.accuracy, Auto.EDDA.accuracy),
+      col.names = c("GLM Accuracy (%)", "LDA Accuracy (%)", "QDA Accuracy (%)", 
+                    "KNN Accuracy (%)", "MclustDA Accuracy (%)", "EDDA Accuracy (%)"), 
+      caption = "Accuracy on Test Data Set by Method")
+```
+
+**Exercise 5:** Read the paper "Who Wrote Ronald Reagan's Radio Addresses" posted on D2L. Write a one page (no more, no less) summary. *You may use 1.5 or double spacing*
+
+**Results:** 
+
+The purpose of the study was to examine the authorship of Ronald Reagan's radio broadcasts, during his campaign for US Presidency which took place from 1975 and 1979. Of the over 1000 radio broadcasts given, there was some question as to the authorship for 312 of them. For the remaining radio addresses, there exists Reagan's original drafts, which eliminates the doubt of authorship. The study used semantics and non-contextual word choices as features in their data analysis. 
+
+The data was comprised of the texts from all radio addresses, as well as several newspaper columns which are known to have been drafted by Peter Hannaford. A similar study to this was done by Augustus De Morgan in his *Budget of Paradoxes* where they noticed the possibility to identify authorship by examining the average length of words used in the composition. This study took on 4 parts. In part 1, they learned how to discriminate between the writing styles of Reagan and his collaborators. In part 2, they use exploratory methods to identify some features that would differentiate Reagan's style from that of his collaborators. In part 3, they presented a full Bayesian approach allowing them to estimate the posterior odds of authorship. Lastly, in part 4, they summarized their approach looking at the comparison of predictions by the "best" machine learning methods.
+
+Through feature selection, they were able to capture the elements of Ronald Reagan's style, as a writer, that would assist in predicting authorship. They used three types of features: words, n-grams, and semantics. Words are self-explanatory. N-grams were the ordered sequences of the adjacent words to the word used and semantic features relate to patterns of composition. 
+
+For words, they focused on 267 of the most frequent 3000 words used by Reagan and Hannaford. They then used a technique of categorization called SMART that removed words that were not considered useful. In the end, they derived 62 key words to use as features. For semantics, they used 21 semantic features that had been discussed in a paper by Collins and Kaufer (2001). Using the concept of information gain, they were able to select the words with the highest information gain ratio scores.
+
+In the end, the "goodness-of-fit study indicated that the Negative-Binomial model was appropriate for word counts and semantic features counts data". They based their word selection scheme and the likelihood of the data upon this model. They also chose 21 sets of constants based on two smaller sets of studies that used 90 and 120 words from speeches drafted by Reagan and the other collaborators. The fully Bayesian Negative Binomial model was very consistent - both with the 21 sets of constants and in terms of predicting the 312 speeches for which authorship was unknown. They segregated 1975 from the other years of 1976-1979 and still were able to obtain consistently accurate predictions on speeches over a variety of topics.
+
+One interesting "shortcut" used was the assumption that words were independent from one another. The authors conceded that although removing the presence of syntax is not true in reality, focusing only "on high frequency, non-contextual words" produced a reasonable initial approximation. 
+
+
+**Exercise 6:** Last homework you chose a dataset from (https://archive.ics.uci.edu/ml/datasets.html). Please do some initial exploration of the dataset. Please report the analysis you did and discuss the challenges with analyzing the data. *Any plots for this question need to be done using only GGplot2-based plots.*
+
+**Results:** I chose the credit-screening data set from the website above. (https://archive.ics.uci.edu/ml/datasets/Credit+Approval). This data set concerns credit card applications, as the website says. Looking at the summary below, we can see that there are some missing values that may require imputation. These are denoted by **?** in the data set. A1, for example, has 12 missing, or **?** values. 
+
+The dependent variable is the factor **A16**. A '+' indicates positive screening (approval?) where as a '-' indicates a negative screening (decline?) on the credit application.
+
+What I found most intriguing about this data set was that the variable names have been removed to protect the confidentiality of the applicants. I had not thought about the reality that this is probably done frequently in some industries - healthcare and finance being two that I am very interested in. I think this, on the surface, makes the data seem more "daunting". In reality though, I think it could be useful in removing biases that we have. One binary factor independent variable, for example, is **A9**. It lists a 't' and an 'f'. Maybe that variable actually represents "College Student", "Previous Bankruptcy", "Income > 150k", etc. This would inherently bias my initial exploration. 
+
+My first step in working with this data set would be to attempt to impute values based on the other values in the variable. In doing so, I would change all '?' values to 'NA'. Next I would begin the imputation process and determine if any observations should be removed (too many NAs, for example). Then I could begin the process of looking for correlations and building models. 
+
+```{r}
+# load credit screening data set
+credit.screening <- read.table("credit-screening.data", sep = ",")
+
+# add column names
+colnames(credit.screening) <- c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11",
+                                "A12", "A13", "A14", "A15", "A16")
+
+# print header and summary
+head(credit.screening, 3)
+summary(credit.screening)
+```
+
+The below summary shows that now, after the change, all *'?'* values are *NA*.
+
+```{r}
+# change '?' to NA for imputation
+credit.screening[credit.screening == "?"] <- NA
+summary(credit.screening)
+```
+
+Now I want to correct a couple of variables - A2 is listed as a factor but is numeric, as is A14. A16 (the dependent variable) is listed as '+' or '-'. I'm making the assumption that '+' means a 'Positive' decision on credit screening and a '-' represents a 'Negative' decision on the credit screening. These are represented by 'P' and 'N' values. Once these are changed, I am printing the header to reflect the changes before I move into imputation. 
+
+```{r}
+# change numeric values listed as factors and replace '+' with 'P' for Positive
+credit.screening$A2 <- as.numeric(credit.screening$A2)
+credit.screening$A14 <- as.numeric(credit.screening$A14)
+credit.screening$A16 <- as.factor(ifelse(credit.screening$A16 == "+", 'P', 'N'))
+head(credit.screening, 3)
+```
+
+Our last step before visualization will be to impute the missing values (NAs) with the most often occuring value in the dataset. 
+
+```{r}
+# create function from stack overflow to impute factor variables with most common (https://stackoverflow.com/questions/36377813/impute-most-frequent-categorical-value-in-all-columns-in-data-frame)
+Mode <- function(x) {
+  ux <- sort(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+i1 <- !sapply(credit.screening, is.numeric)
+
+credit.screening[i1] <- lapply(credit.screening[i1], 
+                               function(x) replace(x, is.na(x), Mode(x[!is.na(x)])))
+
+# impute NA numerical values with the mean of the respective variable
+credit.screening <-
+  credit.screening %>% mutate_if(is.numeric, funs(replace(.,is.na(.), mean(., na.rm = TRUE))))
+```
+
+
+Now we can print the updated summary to show that the NAs have been replaced with the most often occuring variable value for the factors and the mean values for the numeric variables. Now that the NAs are gone, I will do some analysis. 
+
+```{r}
+summary(credit.screening)
+```
+
+First in my exploration, I plotted the relationship for each variable between that of the dependent variable (A16). For numeric predictors, I used box plots and for factor variables I used histograms. 
+
+Some of the more interesting things I notice looking at the relationships are:
+- A higher *A3* value indicates higher likihood toward a '+', or Positive in the credit screening
+- Observations with an 'l' for *A4* receive all Positive screening results
+- Observations with gg for *A5* receive all Positive screening results
+- For *A6*, 'cc', 'q', 'r', 'w', and 'x' result in mostly Positive screening results
+- For *A7*, 'h' and 'z' are the only values that result in mostly Positive screening results
+- A higher *A8* results in more Positive screening results
+- For both *A9* and *A10*, 't' values (True?) make a Positive screening result much better
+- For *A11*, a higher value makes a Positive result better
+- *A15* has some extreme outliers that may need to be removed for accurate modeling. 
+
+```{r}
+A1 <- ggplot(data = credit.screening, aes(x = A1, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A1", y = "Count", title = "A16 Decision by A1") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A2 <- ggplot(data = credit.screening, aes(x = A16, y = A2)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A2") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A3 <- ggplot(data = credit.screening, aes(x = A16, y = A3)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A3") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A4 <- ggplot(data = credit.screening, aes(x = A4, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A4", y = "Count", title = "A16 Decision by A4") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A5 <- ggplot(data = credit.screening, aes(x = A5, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A5", y = "Count", title = "A16 Decision by A5") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A6 <- ggplot(data = credit.screening, aes(x = A6, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A6", y = "Count", title = "A16 Decision by A6") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A7 <- ggplot(data = credit.screening, aes(x = A7, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A7", y = "Count", title = "A16 Decision by A7") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A8 <- ggplot(data = credit.screening, aes(x = A16, y = A8)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A8") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A9 <- ggplot(data = credit.screening, aes(x = A9, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A9", y = "Count", title = "A16 Decision by A9") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A10 <- ggplot(data = credit.screening, aes(x = A10, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A10", y = "Count", title = "A16 Decision by A10") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A11 <- ggplot(data = credit.screening, aes(x = A16, y = A11)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A11") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A12 <- ggplot(data = credit.screening, aes(x = A12, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A12", y = "Count", title = "A16 Decision by A12") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A13 <- ggplot(data = credit.screening, aes(x = A13, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A13", y = "Count", title = "A16 Decision by A13") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A14 <- ggplot(data = credit.screening, aes(x = A16, y = A14)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A14") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A15 <- ggplot(data = credit.screening, aes(x = A16, y = A15)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A15") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+
+grid.arrange(A1, A2, ncol = 2)
+grid.arrange(A3, A4, ncol = 2)
+grid.arrange(A5, A6, ncol = 2)
+grid.arrange(A7, A8, ncol = 2)
+grid.arrange(A9, A10, ncol = 2)
+grid.arrange(A11, A12, ncol = 2)
+grid.arrange(A13, A14, ncol = 2)
+A15
+```
+
+Now that I've examined the relationships between values of the predictors and the value of the dependent variable, I am going to look at the correlations between the independent and dependent variable. 
+
+From the correlation plot below, we see that most of the variables have a very weak impact on the dependent variable. A9, A10, and A11 have the greatest correlation. 
+
+```{r}
+# change factor values to integers for correlation
+credit.screening.dat <- lapply(credit.screening, as.integer)
+ggcorr(credit.screening.dat, palette = "RdBu", label = TRUE)
+```
+
+To summarize, this data set presented an interesting challenge that I had not previously considered in that the variable names were "masked" for confidentiality. In working with the dataset, this removed the biases that I may otherwise have had, as mentioned above. 
+
+Above I've analyzed some key factors of the response, *A16*, that I think would be beneficial in beginning variable selection and model building. I would begin by building different types of models - glm, lda, qda, knn, mclustda, etc. using a combination and interactions of the most influential variables from the correlation plot shown above. 
