@@ -1,0 +1,483 @@
+---
+title: "Homework #6"
+author: "Justin Robinette"
+date: "February 26, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+library(ISLR)       # datasets
+library(knitr)      # kable
+library(dplyr)      # data manipulation
+library(mclust)     #mclustda discriminant analysis
+library(MASS)       #LDA and QDA
+library(class)      #KNN
+```
+
+**Question 5.4.3, pg 198:** We now review k-fold cross-validation.
+
+**Part A:** Explain how k-fold cross-validation is implemented.
+
+**Results:** From *page 181* in the text, the k-fold CV approach "involves randomly dividing the set of observations into *k* groups, or folds, of approximately equal size. The first fold is treated as a validation set, and the method is fit on the remaining *k-1* folds. The mean squared error, MSE, is then computed on the observations in the held-out fold. This procedure is repeated *k* times."
+
+The test error is then estimated by averaging the *k* resulting MSE values. 
+
+**Part B:** What are the advantages and disadvantages of k-fold cross-validation relative to:
+- The validation set approach?
+- LOOCV?
+
+**Results:** The main disadvantages of the validation set approach, relative to k-fold cross-validation, are that the test error rate can be highly variable depending on which observations are included in the training/validation data sets. Also, since only some of the observations are included in the model - the validation set error rate can overestimate the test error for the model fit over the entire dataset. 
+
+The valdiation set approach is easier to implement, however. 
+
+Regarding LOOCV, in relation to the k-fold CV, LOOCV can be computationally expensive because it has *k = n*, meaning it iterates through the entire dataset - as opposed to setting a *k* that is less than the number of observations in the k-fold CV. Also, the LOOCV approach has a higher variance than k-fold CV since we are averaging the results of *n* fitted models - meaning they are highly correlated outputs. 
+
+Conversely, the LOOCV method removes the randomness in the splitting of training and test data sets and provides a more unbiased estimate of the test error. 
+
+**Question 5.4.5, pg 198:** In chapter 4, we used logistic regression to predict the probability of *default* using *income* and *balance* on the *Default* dataset. We will now estimate the test error of this logistic regression model using the validation set approach. Do not forget to set a random seed before beginning your analysis. *Use set.seed(702) to make results replicable*
+
+**Part A:** Fit a logistic regression model that uses *income* and *balance* to predict *default*.
+
+**Results:** Below I've loaded the Default dataset and fit a logistic regression model using the predictors from the instructions. I've printed the summary for confirmation. 
+
+```{r}
+# set seed per instructions
+set.seed(702)
+
+# loaded data set
+data("Default", package = "ISLR")
+# head(Default)
+
+# fit glm model and print summary
+Default_glm1 <- glm(default ~ income + balance, data = Default, family = binomial)
+summary(Default_glm1)
+```
+
+**Part B:** Using the validation set approach, estimate the test error of this model. In order to do this, you must perform the following steps. 
+1) Split the sample set into a training and validation set
+2) Fit a multiple logistic regression model using only the training observations
+3) Obtain a prediction of default status for each individual in the validation set by computing the posterior probability of default for that individual, and classifying that individual to the *default* category if the posterior probability is greater than 0.5
+4) Compute the validation set error, which is the fraction of the observations in the validation set that are misclassified
+
+**Results:** Here, I followed the instructions and split the data set with 70% of the obs going to the training set and 30% of the obs going to the test set.
+
+Then I fit the glm using the training data set. I then included a confusion matrix, although the problem didn't request one, showing that the model was much more accurate (*99.6%*) at predicting the 'No' default values than it was at predicting the 'Yes' default values (*37.4%*). I believe this is because there are so few 'Yes' default values that it makes it hard for the model to identify what causes them. 
+
+Finally, I reported the test error rate as a percentage (*2.5%*), to fulfill the requirements of Part 4 of this exercise. 
+
+```{r}
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(Default))
+
+# set seed per instructions
+set.seed(702)
+
+train_ind <- sample(seq_len(nrow(Default)), size = sample.size)
+
+# split into train and test
+Default.train <- Default[train_ind, ]
+Default.test <- Default[-train_ind, ]
+
+# fit glm on training set
+Default_glm2 <- glm(default ~ income + balance, data = Default.train, family = binomial)
+summary(Default_glm2)
+
+# obtain prediction of default status for test set observations
+Default_prob <- predict(Default_glm2, Default.test, type = "response")
+Default_pred <- ifelse(Default_prob > 0.5, "Yes", "No")
+
+# get confusion matrix
+Default_confmatrix <- table(Default.test$default, Default_pred)
+names(dimnames(Default_confmatrix)) <- c("Observed", "Predicted")
+Default_confmatrix
+
+# validation set error
+Default_glm2_err <- mean(Default.test$default != Default_pred)
+kable(Default_glm2_err*100, col.names = "Test Error (%)", 
+      caption = "Test Error Rate at 70% Train / 30% Test Split")
+```
+
+**Part C:** Repeat the process in (b) three times using three different splits of the observations into training and validation sets. Comment on the results obtained.
+
+**Results:** In the previous exercise, I had used a 70/30 train/test split. Here, per the instructions, I used three different split ratios: *75/25*, *60/40*, and *55/45*. I report all 4 error rates as percentages below. As we can see, the original *70/30* split has the best error rate at *2.5%*. This is followed closely by the other three splits with the *55/45* split performing the worst with an error rate of *2.8%*.
+
+```{r}
+# create 3 different sample sizes from above
+sample.size75 <- (0.75 * nrow(Default))
+sample.size60 <- (0.6 * nrow(Default))
+sample.size55 <- (0.55 * nrow(Default))
+
+# set seed per instructions
+set.seed(702)
+
+# create indeces for splits
+train_ind75 <- sample(seq_len(nrow(Default)), size = sample.size75)
+train_ind60 <- sample(seq_len(nrow(Default)), size = sample.size60)
+train_ind55 <- sample(seq_len(nrow(Default)), size = sample.size55)
+
+# 3 different train / test splits
+Default.train75 <- Default[train_ind75, ]
+Default.test75 <- Default[-train_ind75, ]
+Default.train60 <- Default[train_ind60, ]
+Default.test60 <- Default[-train_ind60, ]
+Default.train55 <- Default[train_ind55, ]
+Default.test55 <- Default[-train_ind55, ]
+
+# fit glm on training sets
+Default_glm75 <- glm(default ~ income + balance, data = Default.train75, family = binomial)
+Default_glm60 <- glm(default ~ income + balance, data = Default.train60, family = binomial)
+Default_glm55 <- glm(default ~ income + balance, data = Default.train55, family = binomial)
+
+# obtain predictions of default status for 3 splits
+Default_prob75 <- predict(Default_glm75, Default.test75, type = "response")
+Default_pred75 <- ifelse(Default_prob75 > 0.5, "Yes", "No")
+Default_prob60 <- predict(Default_glm60, Default.test60, type = "response")
+Default_pred60 <- ifelse(Default_prob60 > 0.5, "Yes", "No")
+Default_prob55 <- predict(Default_glm55, Default.test55, type = "response")
+Default_pred55 <- ifelse(Default_prob55 > 0.5, "Yes", "No")
+
+# validation set error
+Default75_err <- mean(Default.test75$default != Default_pred75)
+Default60_err <- mean(Default.test60$default != Default_pred60)
+Default55_err <- mean(Default.test55$default != Default_pred55)
+kable(cbind(Default55_err*100, Default60_err*100, Default_glm2_err*100, Default75_err*100),
+      col.names = c("Test Error 55/45 Split", "Test Error 60/40 Split", "Test Error 70/30 Split",
+                    "Test Error 75/25 Split"), caption = "Test Error Rates by Split (%)")
+```
+
+**Part D:** Now consider a logistic regression model that predicts the probability of *default* using *income*, *balance*, and a dummy variable for *student*. Estimate the test error for this model using the validation set approach. Comment on whether including the dummy variable for *student* lead to a reduction in the test error rate.
+
+**Results:** Because the 70/30 split performed the best in the above comparison, that is the split I went with for this exercise. This time, I fit a model using student as a predictor. As we can see from the summary, *student* is considered statistically significant as predictor at an alpha of 0.05. With that being said, we can see from the error rate comparison table that there is no improvement in the model's error rate with the inclusion of the student variable. The error rate remains at *2.5%*.
+
+```{r}
+# set seed per instructions
+set.seed(702)
+
+# fit glm on training set
+Default_glm3 <- glm(default ~ income + balance + student, data = Default.train, family = binomial)
+summary(Default_glm3)
+
+# obtain prediction of default status for test set observations
+Default_prob3 <- predict(Default_glm3, Default.test, type = "response")
+Default_pred3 <- ifelse(Default_prob3 > 0.5, "Yes", "No")
+
+# validation set error
+Default_glm3_err <- mean(Default.test$default != Default_pred3)
+kable(cbind(Default_glm2_err*100, Default_glm3_err*100), 
+      col.names = c("Test Error w/out Student (%)", "Test Error w/ Student (%)") , 
+      caption = "Test Error Rate at 70% Train / 30% Test Split")
+```
+
+
+**Question 5.4.7, pg 200:** In sections 5.3.2 and 5.3.3, we saw that the **cv.glm()** function can be used in order to compute the LOOCV test error estimate. Alternatively, one could compute those quatities just using the **glm()** and **predict.glm()** functions, and a for loop. You will now take this approach in order to compute LOOCV error for a simple logistic regression model on the *Weekly* dataset. Recall that in the context of classification problems, the LOOCV error is given in (5.4).
+
+**Part A:** Fit a logistic regression model that predicts *Direction* using *Lag1* and *Lag2*.
+
+**Results:** Here, I loaded the data and fit a logistic regression model using the predictors as required by the assignment. 
+
+```{r}
+# load data set
+data("Weekly", package = "ISLR")
+# head(Weekly)
+
+# fit glm with predictors as required
+Weekly.glm <- glm(Direction ~ Lag1 + Lag2, data = Weekly, family= binomial)
+summary(Weekly.glm)
+```
+
+**Part B:** Fit a logistic regression model that predicts *Direction* using *Lag1* and *Lag2* *using all but the first observation*.
+
+**Results:** I fit the glm excluding the 1st observation using the same predictors as requested. 
+
+```{r}
+# fit glm excluding observation 1
+Weekly.glm2 <- glm(Direction ~ Lag1 + Lag2, family = binomial, data = Weekly[-1,])
+summary(Weekly.glm2)
+```
+
+**Part C:** Use the model from (b) to predict the *Direction* of the first observation. Was this observation correctly classified?
+
+**Results:** As we can see from below, the first observation was incorrectly classified by the model. 
+
+```{r}
+paste("The model's prediction for the first observation is:",
+      ifelse(predict(Weekly.glm2, Weekly[1,], type = "response") > 0.5, "Up", "Down"))
+paste("The true direction of the first observation is:",Weekly[1,]$Direction)
+```
+
+**Part D:** Write a for loop from i=1 to i=n, where n is the number of observations in the dataset, that performs each of the following steps:
+1) Fit a logistic regression using all but the ith observation to predict *Direction* using *Lag1* and *Lag2*
+2) Compute the posterior probability of the market moving up for the ith observation
+3) Use the posterior probability for the ith observation in order to predict whether or not the market moves up
+4) Determine whether or not an error was made in predicting the direction for the ith observation. If an error was made, then indicate this as a 1, and otherwise indicate it as a 0
+
+**Results:** Here I wrote a loop that takes into account the number of observations, and iterates through fitting a logistic regression on all but the *ith* observation to predict market Direction. If an error was made, a 1 in indicated. If the correct prediction was made, a 0 is indicated. 
+
+```{r}
+Weekly.err <- rep(0, nrow(Weekly))
+
+for (i in 1:nrow(Weekly)) {
+    fit.glm <- glm(Direction ~ Lag1 + Lag2, data = Weekly[-i, ],  family = "binomial")
+    fit.pred <- ifelse(predict(fit.glm, Weekly[i, ], type = "response") > 0.5, "Up", "Down")
+    Weekly.err[i] <- ifelse(Weekly[i, ]$Direction == fit.pred, 0, 1)
+}
+Weekly.err
+```
+
+**Part E:** Take the average of the n numbers obtained in *Part D, 4* in order to obtain the LOOCV estimate for the test error. Comment on the results.
+
+**Results:** Here, I've taken the mean of the errors to get the error estimate of the LOOCV model. 
+
+```{r}
+kable(mean(Weekly.err), col.names = "Test Error Estimate", caption = "LOOCV Test Error Estimate")
+```
+
+
+**Exercise 4:** Write your own code (similar to Q #3 above) to estimate test error using 6-fold cross validation for fitting linear regression with *mpg ~ \[horsepower + horsepower^2\]* from the Auto data in the ISLR library. You should show the code in your final PDF.
+
+**Results:**
+
+```{r, echo = TRUE}
+# attach data set
+data("Auto", package = "ISLR")
+
+set.seed (702)
+
+# randomly shuffle the data set
+Auto.dat <- Auto[sample(nrow(Auto)),]
+
+# Create 6 equal size folds 
+folds <- cut(seq(1, nrow(Auto)), breaks = 6, labels = FALSE)
+
+# Perform 6 fold CV
+mse <- c()
+for (i in 1:6){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- Auto[test_indeces, ]
+  train_set <- Auto[-test_indeces, ]
+  lm <- lm(mpg ~ horsepower + I(horsepower^2), data = train_set)
+  prediction <- predict(lm, test_set)
+  mse[i] <- mean((test_set$mpg - prediction)^2)
+}
+
+# mean(error for 6 fold cv) 
+paste("MSE for 6-fold cross validation: ",mean(mse))
+```
+
+
+**Exercise 5:** Last homework you started analyzing the dataset you chose. Now continue the analysis and perform Logistic Regression, KNN, LDA, QDA, MclustDA, and MclustDA with EDDA. 
+
+**Results:** First, I loaded the dataset and repeating the manipulation and imputation steps that I had done in the previous homework. I printed the summary and header to ensure the steps were completed properly.
+
+```{r}
+# load credit screening data set
+credit.screening <- read.table("credit-screening.data", sep = ",")
+
+# add column names
+colnames(credit.screening) <- c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11",
+                                "A12", "A13", "A14", "A15", "A16")
+
+# change '?' to NA for imputation
+credit.screening[credit.screening == "?"] <- NA
+
+# change numeric values listed as factors and replace '+' with 'P' for Positive
+credit.screening$A2 <- as.numeric(credit.screening$A2)
+credit.screening$A14 <- as.numeric(credit.screening$A14)
+credit.screening$A16 <- as.factor(ifelse(credit.screening$A16 == "+", 'P', 'N'))
+
+# create function from stack overflow to impute factor variables with most common (https://stackoverflow.com/questions/36377813/impute-most-frequent-categorical-value-in-all-columns-in-data-frame)
+Mode <- function(x) {
+  ux <- sort(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+i1 <- !sapply(credit.screening, is.numeric)
+
+credit.screening[i1] <- lapply(credit.screening[i1], 
+                               function(x) replace(x, is.na(x), Mode(x[!is.na(x)])))
+
+# impute NA numerical values with the mean of the respective variable
+credit.screening <-
+  credit.screening %>% mutate_if(is.numeric, funs(replace(.,is.na(.), mean(., na.rm = TRUE))))
+
+summary(credit.screening)
+head(credit.screening)
+```
+
+Then, I used correlation matrix to determine variables that are highly correlated with my response variable, A16. I arbitrarily set my limit at abs(0.3), which as we can see, includes variables A8, A9, A10, and A11. 
+
+```{r}
+# created correlation matrix for variable selection
+credit.screening.dat <- as.data.frame(lapply(credit.screening, as.integer))
+credit.cor <- round(cor(credit.screening.dat), 2)
+credit.cor[upper.tri(credit.cor)] <- ""
+credit.cor <- as.data.frame(credit.cor)
+
+# extract correlations with A16 greater than 0.3 or less than -0.3
+res <- credit.cor[16, ]
+res #variables > abs(0.3) = A8, A9, A10, A11
+```
+
+First, I split the data set into training and test sets. Then I fit a glm, LDA, QDA, KNN, MclustDA and MclustDA with EDDA as instructed by the exercise. 
+
+Next, I used the respective models to predict the "Positive" or "Negative" value for A16.
+
+Then, I created confusion matrices for each model based on these predictions. I used KNN k= 1, 5, and 10. As we can see, k=5 is most accurate. 
+
+Beyond this insight, I will examine the accuracy rates further in the next section. 
+
+```{r}
+# set seed for reproducibility
+set.seed(621)
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(credit.screening))
+
+train_ind <- sample(seq_len(nrow(credit.screening)), size = sample.size)
+
+# split into train and test
+credit.train <- credit.screening[train_ind, ]
+credit.test <- credit.screening[-train_ind, ]
+
+# fit glm 
+credit.glm <- glm(A16 ~ A8 + A9 + A10 + A11, data = credit.train, family = binomial)
+# create prediction based on glm above
+glm.probs <- predict(credit.glm, credit.test, type = "response")
+glm.pred <- ifelse(glm.probs > 0.5, "P", "N")
+
+# fit lda
+credit.lda <- lda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for lda
+lda.pred <- predict(credit.lda, credit.test)
+
+# fit qda
+credit.qda <- qda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for qda
+qda.pred <- predict(credit.qda, credit.test)
+
+# Mclust
+credit.train$A9 <- ifelse(credit.train$A9 == 't', 1, 0)
+credit.test$A9 <- ifelse(credit.test$A9 == 't', 1, 0)
+credit.train$A10 <- ifelse(credit.train$A10 == 't', 1, 0)
+credit.test$A10 <- ifelse(credit.test$A10 == 't', 1, 0)
+credit.mclust <- MclustDA(credit.train[, 8:11], class = credit.train$A16)
+credit.mclust.sum <- summary(credit.mclust, parameters = TRUE, what = "classification",
+                             newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# Mclust with EDDA
+credit.edda <- MclustDA(credit.train[, 8:11], class = credit.train$A16,
+                        modelType = "EDDA")
+credit.edda.sum <- summary(credit.edda, parameters = TRUE, what = "classification",
+                           newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# knn model
+# get matrices of predictor and response variables
+credit.train.X <- as.matrix(credit.train[, 8:11])
+credit.test.X <- as.matrix(credit.test[, 8:11])
+credit.A16 <- as.factor(credit.train$A16)
+
+# use KNN to predict A16 with k= 1, 5 and 10
+credit.knn1 <- knn(credit.train.X, credit.test.X, credit.A16, k=1)
+credit.knn5 <- knn(credit.train.X, credit.test.X, credit.A16, k=5)
+credit.knn10 <- knn(credit.train.X, credit.test.X, credit.A16, k=10)
+
+# get confusion matrices
+glm.cf <- table(credit.test$A16, glm.pred)
+names(dimnames(glm.cf)) <- c("Observed", "Predicted")
+paste("GLM Confusion Matrix")
+glm.cf
+
+lda.cf <- table(credit.test$A16, lda.pred$class)
+names(dimnames(lda.cf)) <- c("Observed", "Predicted")
+paste("LDA Confusion Matrix:")
+lda.cf
+
+qda.cf <- table(credit.test$A16, qda.pred$class)
+names(dimnames(qda.cf)) <- c("Observed", "Predicted")
+paste("QDA Confusion Matrix:")
+qda.cf
+
+paste("MClustDA Confusion Matrix:")
+credit.mclust.sum$tab.newdata
+
+paste("MClustDA Confusion Matrix w/ EDDA:")
+credit.edda.sum$tab.newdata
+
+knn.cf1 <- table(credit.test$A16, credit.knn1)
+knn.cf5 <- table(credit.test$A16, credit.knn5)
+knn.cf10 <- table(credit.test$A16, credit.knn10)
+names(dimnames(knn.cf1)) <- c("Observed", "Predicted")
+names(dimnames(knn.cf5)) <- c("Observed", "Predicted")
+names(dimnames(knn.cf10)) <- c("Observed", "Predicted")
+paste("KNN Confusion Matrix k=1:")
+knn.cf1
+paste("KNN Confusion Matrix k=5:")
+knn.cf5
+paste("KNN Confusion Matrix k=10:")
+knn.cf10
+```
+
+Here I calculated the true positive rate, true negative rate, and overall error rate for each model against the test set. Remember, the test set was a randomly selected group of observations equal to 30% of the overall *credit.screening* data set. 
+
+Below, I've printed a table that compares the true positive rate, the true negative rate, and the error rate (against the test set) for each model
+
+As we can see, the MclustDA model performed, overall, the best with an error rate of 14.9%. The GLM and LDA models were the best in terms of true positive accuracy at 90.48% accuracy. The QDA and MclustDA w/ EDDA models were the best in terms of true negative accuracy with measures of 90.32% accurate. 
+
+Based on the below results, and if overall accuracy is our most important measure, then the MclustDA model is superior. 
+
+```{r}
+# get true positive and true negative values for comparison
+glm.truepos <- round(glm.cf[2,2]/(glm.cf[2,2]+glm.cf[2,1])*100, 2)
+glm.trueneg <- round(glm.cf[1,1]/(glm.cf[1,1]+glm.cf[1,2])*100, 2)
+
+lda.truepos <- round(lda.cf[2,2]/(lda.cf[2,2]+lda.cf[2,1])*100, 2)
+lda.trueneg <- round(lda.cf[1,1]/(lda.cf[1,1]+lda.cf[1,2])*100, 2)
+
+qda.truepos <- round(qda.cf[2,2]/(qda.cf[2,2]+qda.cf[2,1])*100, 2)
+qda.trueneg <- round(qda.cf[1,1]/(qda.cf[1,1]+qda.cf[1,2])*100, 2)
+  
+mclust.truepos <- round(credit.mclust.sum$tab.newdata[2,2]/(credit.mclust.sum$tab.newdata[2,2]+
+                                                        credit.mclust.sum$tab.newdata[2,1])*100,2)
+mclust.trueneg <- round(credit.mclust.sum$tab.newdata[1,1]/(credit.mclust.sum$tab.newdata[1,1]+
+                                                               credit.mclust.sum$tab.newdata[1,2])
+                         *100, 2)
+
+edda.truepos <- round(credit.edda.sum$tab.newdata[2,2]/(credit.edda.sum$tab.newdata[2,2]+
+                                                           credit.edda.sum$tab.newdata[2,1])*100,2)
+edda.trueneg <- round(credit.edda.sum$tab.newdata[1,1]/(credit.edda.sum$tab.newdata[1,1]+
+                                                          credit.edda.sum$tab.newdata[1,2])*100,2)
+
+knn5.truepos <- round(knn.cf5[2,2]/(knn.cf5[2,2]+knn.cf5[2,1])*100, 2)
+knn5.trueneg <- round(knn.cf5[1,1]/(knn.cf5[1,1]+knn.cf5[1,2])*100, 2)
+
+truepos <- as.data.frame(
+  rbind(glm.truepos, lda.truepos, qda.truepos, mclust.truepos, edda.truepos, knn5.truepos))
+trueneg <- as.data.frame(
+  rbind(glm.trueneg, lda.trueneg, qda.trueneg, mclust.trueneg, edda.trueneg, knn5.trueneg))
+
+# get error rates
+glm.err <- round(((glm.cf[1,2]+glm.cf[2,1])/nrow(credit.test)*100), 2)
+lda.err <- round(((lda.cf[1,2]+lda.cf[2,1])/nrow(credit.test)*100), 2)
+qda.err <- round(((qda.cf[1,2]+qda.cf[2,1])/nrow(credit.test)*100), 2)
+mclust.err <- round(((credit.mclust.sum$tab.newdata[1,2]+credit.mclust.sum$tab.newdata[2,1])/
+                       nrow(credit.test)*100), 2)
+edda.err <- round(((credit.edda.sum$tab.newdata[1,2]+credit.edda.sum$tab.newdata[2,1])/
+                     nrow(credit.test)*100), 2)
+knn5.err <- round(((knn.cf5[1,2]+knn.cf5[2,1])/nrow(credit.test)*100), 2)
+
+err_sum <- as.data.frame(
+  rbind(glm.err, lda.err, qda.err, mclust.err, edda.err, knn5.err))
+
+# create results summary
+summary.df <- cbind(truepos, trueneg, err_sum)
+colnames(summary.df) <- c("True Positive Accuracy (%)", "True Negative Accuracy (%)", "Error Rate (%)")
+row.names(summary.df) <- c("GLM", "LDA", "QDA", "MclustDA", "MclustDA.EDDA", "KNN5")
+summary.df
+```

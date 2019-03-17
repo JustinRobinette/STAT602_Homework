@@ -1,0 +1,503 @@
+---
+title: "Homework #7"
+author: "Justin Robinette"
+date: "March 12, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+# install.packages("boot")
+# install.packages("neuralnet")
+library(ISLR)      #data set
+library(MASS)      #data set / LDA & QDA
+library(boot)      #bootstrap method
+library(knitr)     #kable
+library(dplyr)     #data manipulation
+library(mclust)    #mclustda discriminant analysis
+library(class)     #KNN
+library(neuralnet) #Neural Networks
+```
+
+**Question 5.4.1, pg 197:** Using basic statistical properties of the variance, as well as single-variable calculus, derive (5.6). In other words, prove that \[\alpha\] given by (5.6) does indeed minimize \[Var(\alpha X + (1 - \alpha)Y)\]
+
+**Results:** 
+Working through the equation to get alpha:
+\[Var(\alpha X + (1-\alpha)Y)\]
+\[= Var(\alpha X) + Var((1-\alpha)Y) +2 Cov(\alpha X, (1-\alpha)Y)\]
+\[= \alpha^2 \sigma_X^2 + (1-\alpha)^2 \sigma_Y^2 + 2 \alpha (1-\alpha) \sigma_{XY}\]
+\[= \alpha^2 \sigma_X^2 + (1+\alpha^2-2\alpha) \sigma_Y^2 + (2\alpha - 2\alpha^2) \sigma_{XY}\]
+\[= \alpha^2 \sigma_X^2 + \sigma_Y^2+\alpha^2\sigma_Y^2-2\alpha\sigma_Y^2 + 2\alpha \sigma_{XY} - 2\alpha^2 \sigma_{XY}\]
+\[\frac{\partial }{\partial \alpha}: 2\alpha\sigma_X^2 + 0 + 2\alpha\sigma_Y^2 - 2\sigma_Y^2 + 2\sigma_{XY} - 4\alpha\sigma_{XY} = 0\]
+\[(2\sigma_X^2 + 2\sigma_Y^2 - 4\sigma_{XY}) \alpha = 2\sigma_Y^2 - 2\sigma_{XY}\]
+\[\alpha = \frac{\sigma_Y^2 - \sigma_{XY}}{\sigma_X^2 + \sigma_Y^2 - 2\sigma_{XY}}\]
+
+Checking that this is the minimum by proving second derivative is positive:
+\[\frac{d^2}{d\alpha^2}Var(\alpha X + (1-\alpha)Y) = 2\sigma_x^2 + 2\sigma_y^2 - 4\sigma_{xy} = 2Var(X - Y) >= 0\]
+
+**Question 5.4.6, pg 199:** We continue to consider the use of a logistic regression model to predict the probability of **default** using **income** and **balance** on the **Default** data set. In particular, we will now compute estimates for the standard errors of the **income** and **balance** coefficients in two different ways: (1) using the bootstrap, and (2) using the standard formula for computing the standard errors in the *glm()* function. Do not forget to set a random seed before beginning your analysis. 
+
+**Part A:** Using the *summary()* and *glm()* functions, determine the estimated standard errors for the coefficients associated with the **income** and **balance** in a multiple logistic regression model that uses both predictors.
+
+**Results:** Below I've loaded the Default data set and printed the estimated standard errors for the coefficients associated with the predictors from the glm model. 
+
+```{r}
+set.seed(702)
+data("Default", package = "ISLR")
+
+default.glm <- glm(default ~ income + balance, data = Default, family = binomial)
+default.sum <- summary(default.glm)
+kable(default.sum$coefficients[c(2,3),2], col.names = "Standard Error",
+      caption = "Estimated Standard Error for Coefficients")
+```
+
+**Part B:** Write a function, *boot.fn()*, that takes as input the **Default** data set as well as an index of the observations, and that outputs the coefficient estimates for the **income** and **balance** in the multiple logistic regression model. 
+
+**Results:** Here is my function, *boot.fn()* that takes the data set and index of obs as inputs. The output are the coefficient estimates of the predictors. 
+
+```{r, echo = TRUE}
+boot.fn <- function(df, trainid) {
+  return(coef(glm(default ~ income + balance, data=df, family=binomial, subset=trainid)))
+}
+boot.fn(Default, 1:nrow(Default))
+```
+
+**Part C:** Use the *boot()* function together with your *boot.fn()* function to estimate the standard errors of the logistic regression coefficients for **income** and **balance**. 
+
+**Results:** The standard error estimates are pretty close between glm and the bootstrap when R=500. See below for the boostrap summary and glm coefficients. 
+
+```{r}
+set.seed(702)
+bootstrap.est <- boot(Default, boot.fn, R = 500)
+bootstrap.est
+default.sum$coefficients[,2]
+```
+
+**Part D:** Comment on the estimated standard errors obtained using the *glm()* function and using your bootstrap function.
+
+**Results:** The estimated standard error, as I said above, is very close. The difference is shown below. 
+**income:** 4.985167e-06 with glm summary vs. 4.827695e-06 using bootstrap
+**balance:** 2.273731e-04 with glm summary vs. 2.393010e-04 using bootstrap
+
+
+**Question 5.4.9, pg 201:** We will now consider the **Boston** housing data set, from the **MASS** library.
+
+**Part A:** Based on this data set, provide an estimate for the population mean of *medv*. Call this estimate \[\hat{\mu}\].
+
+**Results:** The population mean for the median value of owner-occupied homes (in $1,000s) is approximately 22.53281. 
+
+```{r}
+data("Boston", package = "MASS")
+medv_mu <- mean(Boston$medv)
+paste("The population mean for medv is:",medv_mu,"(in $1,000s)")
+```
+
+**Part B:** Provide an estimate of the standard error of \[\hat{\mu}\]. Interpret this result. *Hint: We can compute the standard error of the sample mean by dividing the sample standard deviation by the square root of the number of observations.*
+
+**Results:** As we can see below, the mean values are the same rounded to 5 decimals. The standard error, using bootstrap, was 0.4253019 vs. 0.40886 in part B using the formula. 
+
+```{r}
+medv_se <- sd(Boston$medv)/sqrt(nrow(Boston))
+paste("The standard error for medv is:",round(medv_se,5),"(rounded to 5 decimal places)")
+```
+
+**Part C:** Now estimate the standard error of \[\hat{\mu}\] using the bootstrap. How does this compare with your answer from (b)?
+
+**Results:** As we can see below, the mean values are the same rounded to 5 decimals. 
+
+```{r}
+set.seed(702)
+mean.fn <- function(variable, id) {
+  return(mean(variable[id]))
+}
+boot.mean <- boot(Boston$medv, mean.fn, R = 500)
+boot.mean
+medv_mu
+```
+
+**Part D:** Based on your bootstrap estimate from (c), provide a 95% confidence interval for the mean of *medv*. Compare it to the results obtained using *t.test(Boston$medv)*. *Hint: You can approximate a 95% confidence interval using the formula \[[\hat{\mu} - 2SE(\hat{\mu}), \hat{\mu} + 2SE(\hat{\mu})]\].
+
+**Results:** Using the formula for 95% confidence interval, we get a lower limit of 21.72234 vs. with the t.test function we get 21.72953. Using the formual, we get an upper limit of 23.34327 vs. using the t.test function we get 23.33608. As we can see, these confidence intervals for the mean of *medv* are pretty close but there is a slight difference in both. 
+
+```{r}
+CI.medv <- c(boot.mean$t0 - 2*sd(boot.mean$t), boot.mean$t0 + 2*sd(boot.mean$t))
+CI.medv
+t.test(Boston$medv)
+```
+
+**Part E:** Based on the data set, provide an estimate, \[\hat{\mu}_{med}\], for the median value of *medv* in the population. 
+
+**Results:** The median of the *medv* variable is 21.2 (in $1,000s)
+
+```{r}
+medv_median <- median(Boston$medv)
+paste("The median for medv is:",medv_median,"(in thousands)")
+```
+
+**Part F:** We now would like to estimate the standard error of \[\hat{\mu}_{med}\]. Unfortunately, there is no simple formula for computing the standard error of the median. Instead, estimate the standard error of the median using the bootstrap. Comment on your findings.
+
+**Results:** Here we can see both the standard R function, and the user defined function using bootstrap give the same value of 21.2.
+
+```{r}
+median.fn <- function(variable, id) {
+  return(median(variable[id]))
+}
+boot.median <- boot(Boston$medv, median.fn, R = 500)
+boot.median
+medv_median
+```
+
+**Part G:** Based on this data set, provide an estimate for the tenth percentile of *medv* in Boston suburbs. Call this quantity \[\hat{\mu}_{0.1}\]. (You can use the *quantile()* function.)
+
+**Results:** The 10th percentile for the *medv* variable, using the quantile function, is 12.75 (in thousands).
+
+```{r}
+mu_0.1 <- quantile(Boston$medv, 0.1)
+kable(mu_0.1, col.names = "Estimated Tenth Percentile")
+```
+
+**Part H:** Use the bootstrap to estimate the standard error of \[\hat{\mu}_{0.1}\]. Comment on your findings. 
+
+**Results:** Here we see that we get the same tenth percent value using both methods. The standard error is 0.5064524.
+
+```{r}
+tenth.fn <- function(variable, id) {
+  mu <- quantile(variable[id], c(0.1))
+  return(mu)
+}
+boot(Boston$medv, tenth.fn, R = 500)
+mu_0.1
+```
+
+**Exercise 4:** Last homework you have used different classification methods to analyze the dataset you chose. Now use
+i. Validation Set Approach(VSA)
+ii. LOOCV and 5-Fold Cross Validation to test the error rate for the following models. Chose the best model based on test error.
+iii. Logistic Regression
+iv. KNN (choose the best k)
+v. LDA
+vi. QDA
+vii. MclustDA - best model chosen by BIC
+viii. MclustDA - with modelType = "EDDA"
+ix. Find a new method that we haven't covered in class that can do classification
+
+Summarize the results in a table form (See below). **DO NOT** show your summary directly from the code. Report only the important information as figures and tables. If you can't perform any of the analysis mentioned above, write the reason why. Write a description and draw conclusions in the context of the original problem from your analysis. Use the kable() function to make table when knitting. 
+
+*Note: You may do presentations on the dataset you have been analyzing so be thinking of that while doing the analysis. Make sure to note all the steps you took in analyzing the data.*
+
+**Results:** First, I loaded the dataset and repeated the manipulation and imputation steps that I had done in the previous homework assignments. 
+
+```{r}
+# load credit screening data set
+credit.screening <- read.table("credit-screening.data", sep = ",")
+
+# add column names
+colnames(credit.screening) <- c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11",
+                                "A12", "A13", "A14", "A15", "A16")
+
+# change '?' to NA for imputation
+credit.screening[credit.screening == "?"] <- NA
+
+# change numeric values listed as factors and replace '+' with 'P' for Positive
+credit.screening$A2 <- as.numeric(credit.screening$A2)
+credit.screening$A14 <- as.numeric(credit.screening$A14)
+credit.screening$A16 <- as.factor(ifelse(credit.screening$A16 == "+", 'P', 'N'))
+
+# create function from stack overflow to impute factor variables with most common (https://stackoverflow.com/questions/36377813/impute-most-frequent-categorical-value-in-all-columns-in-data-frame)
+Mode <- function(x) {
+  ux <- sort(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+i1 <- !sapply(credit.screening, is.numeric)
+
+credit.screening[i1] <- lapply(credit.screening[i1], 
+                               function(x) replace(x, is.na(x), Mode(x[!is.na(x)])))
+
+# impute NA numerical values with the mean of the respective variable
+credit.screening <-
+  credit.screening %>% mutate_if(is.numeric, funs(replace(.,is.na(.), mean(., na.rm = TRUE))))
+
+credit.screening$A9 <- ifelse(credit.screening$A9 == 't', 1, 0)
+credit.screening$A10 <- ifelse(credit.screening$A10 == 't', 1, 0)
+
+head(credit.screening)
+```
+
+Then, I used correlation matrix to determine variables that are highly correlated with my response variable, A16. I arbitrarily set my limit at abs(0.3), which as we can see, includes variables A8, A9, A10, and A11. 
+
+```{r}
+# created correlation matrix for variable selection
+credit.screening.dat <- as.data.frame(lapply(credit.screening, as.integer))
+credit.cor <- round(cor(credit.screening.dat), 2)
+credit.cor[upper.tri(credit.cor)] <- ""
+credit.cor <- as.data.frame(credit.cor)
+
+# extract correlations with A16 greater than 0.3 or less than -0.3
+res <- credit.cor[16, ]
+res #variables > abs(0.3) = A8, A9, A10, A11
+```
+
+I used the same code from HW6 to get error rates using VSA and requested models. 
+
+```{r}
+# set seed for reproducibility
+set.seed(702)
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(credit.screening))
+
+train_ind <- sample(seq_len(nrow(credit.screening)), size = sample.size)
+
+# split into train and test
+credit.train <- credit.screening[train_ind, ]
+credit.test <- credit.screening[-train_ind, ]
+
+# fit glm 
+credit.glm <- glm(A16 ~ A8 + A9 + A10 + A11, data = credit.train, family = binomial)
+# create prediction based on glm above
+glm.probs <- predict(credit.glm, credit.test, type = "response")
+glm.pred <- ifelse(glm.probs > 0.5, "P", "N")
+
+# fit lda
+credit.lda <- lda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for lda
+lda.pred <- predict(credit.lda, credit.test)
+
+# fit qda
+credit.qda <- qda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for qda
+qda.pred <- predict(credit.qda, credit.test)
+
+# Mclust
+credit.mclust <- MclustDA(credit.train[, 8:11], class = credit.train$A16)
+credit.mclust.sum <- summary(credit.mclust, parameters = TRUE, what = "classification",
+                             newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# Mclust with EDDA
+credit.edda <- MclustDA(credit.train[, 8:11], class = credit.train$A16,
+                        modelType = "EDDA")
+credit.edda.sum <- summary(credit.edda, parameters = TRUE, what = "classification",
+                           newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# knn model
+# get matrices of predictor and response variables
+credit.train.X <- as.matrix(credit.train[, 8:11])
+credit.test.X <- as.matrix(credit.test[, 8:11])
+credit.A16 <- as.factor(credit.train$A16)
+
+# use KNN to predict A16 with k= 5 because that was best performing on HW6
+credit.knn5 <- knn(credit.train.X, credit.test.X, credit.A16, k=5)
+
+# get confusion matrices
+glm.cf <- table(credit.test$A16, glm.pred)
+names(dimnames(glm.cf)) <- c("Observed", "Predicted")
+
+lda.cf <- table(credit.test$A16, lda.pred$class)
+names(dimnames(lda.cf)) <- c("Observed", "Predicted")
+
+qda.cf <- table(credit.test$A16, qda.pred$class)
+names(dimnames(qda.cf)) <- c("Observed", "Predicted")
+
+# using KNN k=5 because it was best performing KNN model on HW6
+knn.cf5 <- table(credit.test$A16, credit.knn5)
+names(dimnames(knn.cf5)) <- c("Observed", "Predicted")
+```
+
+Here I calculated the error rates for the methods from the previous assignment.
+
+```{r}
+# get error rates
+glm.err <- round(((glm.cf[1,2]+glm.cf[2,1])/nrow(credit.test)*100), 4)
+lda.err <- round(((lda.cf[1,2]+lda.cf[2,1])/nrow(credit.test)*100), 4)
+qda.err <- round(((qda.cf[1,2]+qda.cf[2,1])/nrow(credit.test)*100), 4)
+mclust.err <- round(((credit.mclust.sum$tab.newdata[1,2]+credit.mclust.sum$tab.newdata[2,1])/
+                       nrow(credit.test)*100), 4)
+edda.err <- round(((credit.edda.sum$tab.newdata[1,2]+credit.edda.sum$tab.newdata[2,1])/
+                     nrow(credit.test)*100), 4)
+knn5.err <- round(((knn.cf5[1,2]+knn.cf5[2,1])/nrow(credit.test)*100), 4)
+```
+
+First, I will perform VSA using a new method not covered in class thus far. I chose to use Neural Network. 
+
+To do so, I fit the model using the *neuralnet()* function and the same predictor variables as previous models. Then I obtained predictions based on the model and reported the error rate (**12.0192%**) on the test set. 
+
+```{r}
+set.seed(702)
+# fit model using neural networking
+credit.nn <- neuralnet(A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# summary(credit.nn)
+# credit.nn$result.matrix
+
+# create prediction based on nn above using subset of testing set and compute() function from 
+# neuralnet package
+nn.test <- subset(credit.test, select = c(A8, A9, A10, A11))
+# head(nn.test)
+nn.results <- compute(credit.nn, nn.test)
+nn.probs <- data.frame(Observed = credit.test$A16, Probability = nn.results$net.result[,2])
+nn.pred <- ifelse(nn.probs$Probability > 0.5, "P", "N")
+
+# create confusion matrix
+nn.cf <- table(credit.test$A16, nn.pred)
+names(dimnames(nn.cf)) <- c("Observed", "Predicted")
+
+# get error rate for nn
+nn.err <- round(((nn.cf[1,2]+nn.cf[2,1])/nrow(credit.test)*100), 4)
+
+paste("The test error rate of the Neural Network method is:", nn.err,"%")
+
+# bind error rate with other rates from HW6
+vsa_err_sum <- rbind(glm.err, knn5.err, lda.err, qda.err, mclust.err, edda.err, nn.err)
+```
+
+Next, I completed LOOCV for the 7 different methods, as requested. I used a couple different methods based on the modeling method being used and saved the error rates for reporting in the final table.
+
+```{r}
+##### LOOCV #####
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# LOOCV on glm
+set.seed(702)
+loocv.glm.err <- rep(0, nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  fit.glm <- glm(formula = formula, data = credit.screening[-i, ], family = "binomial")
+  fit.pred <- ifelse(predict(fit.glm, credit.screening[i, ], type = "response") > 0.5, "P", "N")
+  loocv.glm.err[i] <- ifelse(credit.screening[i, ]$A16 == fit.pred, 0, 1)
+}
+loocv.glm.err <- round(mean(loocv.glm.err)*100, 4)
+
+# LOOCV for Neural Network
+set.seed(702)
+loocv.nn.err <- rep(0, nrow(credit.screening))
+library(plyr)
+pbar <- create_progress_bar('text')
+pbar$init(nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  loocv.nn <- neuralnet(formula = formula, data = credit.screening, linear.output = FALSE)
+  results.nn <- compute(loocv.nn, credit.screening[i, ])
+  pred.nn <- ifelse(results.nn$net.result[,2] > 0.5, "P", "N")
+  loocv.nn.err[i] <- ifelse(credit.screening[i, ]$A16 == pred.nn, 0, 1)
+  pbar$step()
+}
+loocv.nn.err <- round(mean(loocv.nn.err)*100, 4)
+
+# LOOCV for LDA 
+credit.lda.loocv <- lda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.lda.err <- round(mean(credit.lda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for QDA
+credit.qda.loocv <- qda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.qda.err <- round(mean(credit.qda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for MClustDA & MClustDA w/ EDDA
+credit.mclust <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16)
+mclust.loocv <- cvMclustDA(credit.mclust, nfold = nrow(credit.screening))
+loocv.mclust.err <- round(mclust.loocv$error*100, 4)
+
+credit.edda <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16, modelType = "EDDA")
+edda.loocv <- cvMclustDA(credit.edda, nfold = nrow(credit.screening))
+loocv.edda.err <- round(edda.loocv$error*100, 4)
+
+# LOOCV for KNN
+credit.knn.loocv <- knn.cv(as.matrix(credit.screening[, 8:11]), 
+                     cl = as.factor(credit.screening$A16), k = 5, use.all = TRUE, prob = FALSE)
+loocv.knn.err <- round(mean(credit.knn.loocv != credit.screening$A16)*100, 4)
+
+loocv_err_sum <- rbind(loocv.glm.err, loocv.knn.err, loocv.lda.err, 
+                       loocv.qda.err, loocv.mclust.err, loocv.edda.err, loocv.nn.err)
+```
+
+Lastly, I performed 5 fold CV using a loop that iterates 5 times through each of the modeling methods to obtain the test error rate. I then saved these error rates to add to the final summary table. 
+
+```{r}
+##### 5-fold CV #####
+set.seed (702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# randomly shuffle the data set and remove unneccessary columns
+credit.dat <- credit.screening[sample(nrow(credit.screening)),]
+credit.dat <- credit.dat[, c(8:11, 16)]
+
+# Create 5 equal size folds 
+folds <- cut(seq(1, nrow(credit.screening)), breaks = 5, labels = FALSE)
+
+# Perform 5 fold CV
+cv5.glm.err <- c()
+cv5.lda.err <- c()
+cv5.qda.err <- c()
+cv5.mclust.err <- c()
+cv5.edda.err <- c()
+cv5.nn.err <- c()
+cv5.knn.err <- c()
+for (i in 1:5){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- credit.dat[test_indeces, ]
+  train_set <- credit.dat[-test_indeces, ]
+  # logistic regression
+  glm <- glm(formula = formula, data = train_set, family = "binomial")
+  glm.prediction <- ifelse(predict(glm, test_set, type = "response") > 0.5, "P", "N")
+  cv5.glm.err[i] <- mean(test_set$A16 != glm.prediction)
+  # neural network
+  nn.5 <- neuralnet(formula = formula, data = train_set)
+  nn.test.5 <- subset(test_set, select = c(A8, A9, A10, A11))
+  nn.results.5 <- compute(nn.5, nn.test.5)
+  nn.pred.5 <- ifelse(nn.results.5$net.result[,2] > 0.5, "P", "N")
+  cv5.nn.err[i] <- mean(test_set$A16 != nn.pred.5)
+  # lda
+  lda <- lda(formula = formula, data = train_set)
+  lda.prediction <- predict(lda, test_set)
+  cv5.lda.err[i] <- mean(test_set$A16 != lda.prediction$class)
+  # qda
+  qda <- qda(formula = formula, data = train_set)
+  qda.prediction <- predict(qda, test_set)
+  cv5.qda.err[i] <- mean(test_set$A16 != qda.prediction$class)
+  # Mclust
+  mclust.5 <- MclustDA(train_set[, 1:4], class = train_set$A16)
+  mclust.5.sum <- summary(mclust.5, parameters = TRUE, what = "classification",
+                             newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.mclust.err[i] <- mclust.5.sum$err.newdata 
+  # Mclust w/ EDDA
+  edda.5 <- MclustDA(train_set[, 1:4], class = train_set$A16, modelType = "EDDA")
+  edda.5.sum <- summary(edda.5, parameters = TRUE, what = "classification", 
+                        newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.edda.err[i] <- edda.5.sum$err.newdata   
+  # knn k=5
+  knn.5 <- knn(as.matrix(train_set[, 1:4]), as.matrix(test_set[, 1:4]), 
+               as.factor(train_set$A16), k=5)
+  cv5.knn.err[i] <- mean(test_set$A16 != knn.5)
+}
+
+# format for chart
+cv5.glm.err <- round(mean(cv5.glm.err)*100, 4)
+cv5.lda.err <- round(mean(cv5.lda.err)*100, 4)
+cv5.qda.err <- round(mean(cv5.qda.err)*100, 4)
+cv5.nn.err <- round(mean(cv5.nn.err)*100, 4)
+cv5.mclust.err <- round(mean(cv5.mclust.err)*100, 4)
+cv5.edda.err <- round(mean(cv5.edda.err)*100, 4)
+cv5.knn.err <- round(mean(cv5.knn.err)*100, 4)
+
+cv5_err_sum <- rbind(cv5.glm.err, cv5.knn.err, cv5.lda.err, cv5.qda.err, 
+                     cv5.mclust.err, cv5.edda.err, cv5.nn.err)
+```
+
+Below we see a table, similar to the one that was requested. It displays the test error rate for each Method for VSA, LOOCV, and 5-Fold CV.
+
+We can see that the overall worst error rate came from the LOOCV approach with the MclustDA method. We also notice that KNN performed relatively worse than the other methods using k=5 (which was shown to be the best k in the previous homework assignments.) 
+
+The best performing methods using VSA were Logistic Reg, LDA, and Neural Network all coming in with a test error rate of *12.0192%*. The best performing methods using the LOOCV approach were Logistic Regression and LDA - each achieving a test error rate of *14.4928% (rounded to 4 decimals)*. This test error rate is also the best test error rate present in the 5-Fold CV column of the table. Here it was achieved by Logistic Regression, LDA, and Neural Network. 
+
+```{r}
+Method <- c("Logistic Reg", "KNN", "LDA", "QDA", "MclustDA", "MclustDA (EDDA)", 
+            "Neural Network")
+final_sum <- as.data.frame(cbind(Method, vsa_err_sum, loocv_err_sum, cv5_err_sum))
+rownames(final_sum) <- NULL
+colnames(final_sum) <- c("Method", "VSA", "LOOCV", "5-Fold CV")
+
+kable(final_sum, caption = "Test Error by Validation Approach (%)")
+```
+
