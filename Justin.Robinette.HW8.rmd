@@ -1,0 +1,332 @@
+---
+title: "Homework #8"
+author: "Justin Robinette"
+date: "March 19, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+# install.packages("glmnet")
+# install.packages("pls")
+# install.package("leaps")
+library(knitr)       #kable
+library(glmnet)      #glm with lasso
+library(pls)         #PCR and PLS models
+library(ggplot2)     #visualization
+library(leaps)       #regsubsets
+library(MASS)        #data set
+library(reshape2)    #manipulation
+```
+
+**Question 6.8.4, pg 260:** Suppose we estimate the regression coefficients in a linear regression model by minimizing
+\[\sum^n_{i=1}(y_i - \beta_0 - \sum^p_{j=1}\beta_jx_{ij})^2 + \lambda\sum^p_{j=1}\beta^2_j\] for a particular value of \[\lambda\]. For parts (a) through (e), indicate which of i. through v. is correct. Justify your answer.
+
+*i. Increase initially, and then eventually start decreasing in an inverted U shape.*
+*ii. Decrease initially, and then eventually start increasing in a U shape.*
+*iii. Steadily increase.*
+*iV. Steadily decrease.*
+*v. Remain constant.*
+
+**Part A:** As we increase **lambda** from 0, the training RSS will:
+
+**Results:** **iii** - Training error increases steadily because of less flexibility in the model
+
+**Part B:** As we increase **lambda** from 0, the test RSS will:
+
+**Results:** **ii** - Test error will decrease initially and then increase because, as the model becomes less flexible, the initial response will be a decrease in test RSS. Then it will increase again in a U shaped pattern.
+
+**Part C:** As we increase **lambda** from 0, the variance will:
+
+**Results:** **iv** Variance will decrease steadily because of more constraints
+
+**Part D:** As we increase **lambda** from 0, the (sqaured) bias will:
+
+**Results:** **iii** - Bias will steadily increase because of less flexibility in the model
+
+**Part E:** As we increase **lambda** from 0, the ireeducible error will:
+
+**Results:** **v** - Irreducible error is a constant value, therefore it remains constant
+
+
+**Question 6.8.9, pg 263:** In this exercise, we will predict the number of applications received using the other variables in the **College** data set.
+
+**Part A:** Split the data into a training and test set.
+
+**Results:** The data set has been split with 70% of obs in training and 30% of obs in test. A table shows the number of observations in the total data set, and the training and test sets. 
+
+```{r}
+set.seed(702)
+
+# load data
+data("College", package = "ISLR")
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(College))
+
+train_ind <- sample(seq_len(nrow(College)), size = sample.size)
+
+# split into train and test
+College.train <- College[train_ind, ]
+College.test <- College[-train_ind, ]
+
+kable(cbind(nrow(College), nrow(College.train), nrow(College.test)), col.names = 
+        c("College", "College Training", "College Test"))
+```
+
+**Part B:** Fit a linear model using least squares on the training set, and report the test error obtained.
+
+**Results:** I have fit a linear model on the training set and used it to predict for the test set. I then calculated the mse and reported it below. 
+
+```{r}
+# fit a model using Apps as the response and the remaining variables as the predictors
+fit.lm <- lm(Apps ~ ., data = College.train)
+
+# predicted apps based on the linear model
+pred.lm <- predict(fit.lm, College.test)
+
+# calculate and report mse for the model
+mse.lm <- mean((pred.lm - College.test$Apps)^2)
+paste("The test error rate obtained by the linear model is:",mse.lm)
+```
+
+**Part C:** Fit a ridge regression model on the training set, with lambda chosen by cross-validation. Report the test error obtained. 
+
+**Results:** First, I created matrices out of the train and test sets using *model.matrix()* and used *cv.glmnet()* to fit the ridge regression model. I then chose the best lambda from the model and used it in the prediction. Finally, I reported the MSE, which is higher than in was with the least squares linear model from Part A.
+
+```{r}
+set.seed(702)
+
+# switch to matrices
+train.X <- model.matrix(Apps ~ ., data = College.train)
+test.X <- model.matrix(Apps ~ ., data = College.test)
+grid <- 10 ^ seq(10, -2, length = 100)
+
+# fit ridge regression
+fit.ridge <- cv.glmnet(train.X, College.train$Apps, alpha = 0, lambda = grid)
+
+# choose minimum lambda from cv model
+bestlambda <- fit.ridge$lambda.min
+
+# predict test
+pred.ridge <- predict(fit.ridge, s = bestlambda, newx = test.X)
+
+# get error rate
+mse.ridge <- mean((College.test$Apps - pred.ridge)^2)
+paste("The test error rate obtained by the ridge regression model is:",mse.ridge)
+```
+
+**Part D:** Fit a lasso model on the training set, with lambda chosen by cross-validation. Report the test error obtained, as well as the number of non-zero coefficient estimates. 
+
+**Results:** Here I fit a lasso model on the training set and chose the best lambda from the model. I then reported the test error rate and the number of non-zero coefficient estimates (**15**).
+
+```{r}
+set.seed(702)
+# fit a lasso model
+fit.lasso <- cv.glmnet(train.X, College.train$Apps, alpha = 1, lambda = grid)
+
+# choose lambda from the cv model
+bestlambda2 <- fit.lasso$lambda.min
+
+# predict apps from test set
+pred.lasso <- predict(fit.lasso, s = bestlambda2, newx = test.X)
+
+# get error rate
+mse.lasso <- mean((College.test$Apps - pred.lasso)^2)
+paste("The test error rate obtained by the lasso model is:",mse.lasso)
+
+# get coefficients and report number of non-zero estimates
+coefficients <- predict(fit.lasso, s = bestlambda2, type = "coefficients")
+coefficients <- coefficients[coefficients != 0]
+paste("The number of non-zero coefficient estimates is:",length(coefficients))
+```
+
+**Part E:** Fit a PCR model on the training set, with *M* chosen by cross-validation. Report the test error obtained, along with the value of *M* selected by cross-validation. 
+
+**Results:** First I fit the PCR model on the training set and plotted the validation plot showing Mean Square Error of Prediction by number of components. Based on this plot, it appears that the cross validation is suggesting that we should use all predictors in the model. I used *M* to include all predictors and the *predict()* function to obtain predictions and the MSE, which is reported below. 
+
+```{r}
+set.seed(702)
+
+# fit PCR model on training set and plot Mean Square Error of Prediction by number of components
+fit.pcr <- pcr(Apps ~ ., data = College.train, scale = TRUE, validation = "CV")
+validationplot(fit.pcr, val.type = "MSEP")
+
+# set M based on plot to be the number of variables minus 1 to account for the response variable
+M <- ncol(College) - 1
+
+# predict Apps
+pred.pcr <- predict(fit.pcr, College.test, ncomp = M)
+
+# get error rate
+mse.pcr <- mean((College.test$Apps - pred.pcr)^2)
+paste("The test error rate obtained by the PCR model is:",mse.pcr)
+```
+
+**Part F:** Fit a PLS model on the training set, with *M* chosen by cross-validation. Report the test error obtained, along with the value of *M* selected by cross-validation. 
+
+**Results:** First I fit the PLS model on the training set and plotted the validation plot showing Mean Square Error of Prediction by number of components. Based on this plot, it appears that the MSEP remains relatively constant at 10 components. I used *M* to include 10 components and the *predict()* function to obtain predictions and the MSE, which is reported below. 
+
+```{r}
+set.seed(702)
+
+# fit pls model
+fit.pls <- plsr(Apps ~ ., data = College.train, scale = TRUE, validation = "CV")
+validationplot(fit.pls, val.type = "MSEP")
+
+# predict Apps
+pred.pls <- predict(fit.pls, College.test, ncomp = 10)
+
+# get error rate
+mse.pls <- mean((College.test$Apps - pred.pls)^2)
+paste("The test error rate obtained by the PLS model is:",mse.pls)
+```
+
+**Part G:** Comment on the results obtained. How accurately can we predict the number of college applications received? Is there much difference among the test errors resulting from these 5 approaches?
+
+**Results:** As we can see from the table below, PCR and LM had the lowest test error rate, followed by PLS and then Lasso. Ridge was the worst performing.
+
+I also constructed a barplot to show that there is not much different among the test errors resulting from the different methods. 
+
+Additionally, we are not able to predict the number of college applications received well. 
+
+```{r}
+# combine error rates and report in table
+mse.summary <- as.data.frame(cbind(mse.lm, mse.ridge, mse.lasso, mse.pcr, mse.pls))
+colnames(mse.summary) <- c("LM", "Ridge", "Lasso", "PCR", "PLS")
+kable(mse.summary, caption = "MSE by Model Type")
+
+# report in barplot
+ggplot(melt(mse.summary), aes(x = variable, y = value)) +
+  geom_bar(stat = "identity", position = "dodge", aes(fill = rainbow(5))) +
+  labs(x = "Model", y = "Test Error Rate", title = "Test Error Rate by Model") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none")
+```
+
+
+**Question 6.8.11, pg 264:** We will now try to predict per capita crime rate in the **Boston** data set.
+
+**Part A:** Try out some of the regression methods explored in this chapter, such as best subset selection, the lasso, ridge regression, and PCR. Present and discuss resultls for the approaches that you consider.
+
+**Results:** Here I've loaded the data set and split into test and train. 
+
+```{r}
+set.seed(702)
+
+# load data set
+data("Boston", package = "MASS")
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(Boston))
+
+train_ind <- sample(seq_len(nrow(Boston)), size = sample.size)
+
+# split into train and test
+Boston.train <- Boston[train_ind, ]
+Boston.test <- Boston[-train_ind, ]
+
+kable(cbind(nrow(Boston), nrow(Boston.train), nrow(Boston.test)), col.names = 
+        c("Boston", "Boston Training", "Boston Test"))
+```
+
+**Part B:** Propose a model (or set of models) that seem to perform well on this data set, and justify your answer. Make sure that you are evaluating model performance using validation set error, cross-validation, or some other reasonable alternative (not training error).
+
+**Results:** For this step, I used the following modeling methods:
+- Linear Model
+- Ridge Regression
+- Lasso Model
+- Forward Stepwise Selection
+- Backward Stepwise Selection
+- Principal Component Regression
+- Partial Least Squares Regression
+
+From the table below, we can see that the Lasso model performed the best with a test error of **22.17753**. The worst performing models were the LM, PCR, and PLS with a test error of **23.49987**. 
+
+Not only did the Lasso model perform the best, but it also eliminates some predictors which simplifies the model.
+
+```{r}
+set.seed(702)
+
+# basic lm
+boston.lm <- lm(crim ~ ., data = Boston.train)
+bostonlm.pred <- predict(boston.lm, newdata = Boston.test)
+bostonlm.mse <- mean((Boston.test$crim - bostonlm.pred)^2)
+
+# ridge regression
+Boston_train.X <- model.matrix(crim ~ ., data = Boston.train)
+Boston_test.X <- model.matrix(crim ~ ., data = Boston.test)
+boston.ridge <- cv.glmnet(Boston_train.X, Boston.train$crim, alpha = 0, lambda = grid)
+boston.lambda1 <- boston.ridge$lambda.min
+bostonRidge.pred <- predict(boston.ridge, s = boston.lambda1, newx = Boston_test.X)
+bostonRidge.mse <- mean((Boston.test$crim - bostonRidge.pred)^2)  
+
+# lasso
+boston.lasso <- cv.glmnet(Boston_train.X, Boston.train$crim, alpha = 1, lambda = grid)
+boston.lambda2 <- boston.lasso$lambda.min
+bostonLasso.pred <- predict(boston.lasso, s = boston.lambda2, newx = Boston_test.X)
+bostonLasso.mse <- mean((Boston.test$crim - bostonLasso.pred)^2)
+
+# predict function from chapter 6 
+predict.regsubsets <- function(object, newdata, id, ...) {
+  form <- as.formula(object$call[[2]])
+  mat <- model.matrix(form, newdata)
+  coefi <- coef(object, id=id)
+  xvars <- names(coefi)
+  mat[,xvars]%*%coefi
+}
+
+# forward stepwise
+regfit.fwd <- regsubsets(crim ~ ., data = Boston.train, nvmax = ncol(Boston)-1, method = "forward")
+bostonFwd.mse <- rep(NA, ncol(Boston)-1)
+for(i in 1:(ncol(Boston)-1)) {
+  pred.fwd <- predict(regfit.fwd, Boston.test, id = i)
+  bostonFwd.mse[i] <- mean((Boston.test$crim - pred.fwd)^2)
+}
+# which.min(bostonFwd.mse)
+bostonFwd.mse <- bostonFwd.mse[7]
+
+# backward stepwise
+regfit.back <- regsubsets(crim ~ ., data = Boston.train, nvmax = ncol(Boston)-1, 
+                          method = "backward")
+bostonBack.mse <- rep(NA, ncol(Boston)-1)
+for(i in 1:(ncol(Boston)-1)) {
+  pred.back <- predict(regfit.back, Boston.test, id = i)
+  bostonBack.mse[i] <- mean((Boston.test$crim - pred.back)^2)
+}
+# which.min(bostonBack.mse)
+bostonBack.mse <- bostonBack.mse[4]
+
+# principal component regression
+boston.pcr <- pcr(crim ~ ., data = Boston.train, scale = TRUE, validation = "CV")
+validationplot(boston.pcr, val.type = "MSEP")
+boston.M <- ncol(Boston) - 1
+bostonPCR.pred <- predict(boston.pcr, Boston.test, ncomp = boston.M)
+bostonPCR.mse <- mean((Boston.test$crim - bostonPCR.pred)^2)
+
+# partial least squares
+boston.pls <- plsr(crim ~ ., data = Boston.train, scale = TRUE, validation = "CV")
+validationplot(boston.pls, val.type = "MSEP")
+bostonPLS.pred <- predict(boston.pls, Boston.test, ncomp = boston.M)
+bostonPLS.mse <- mean((Boston.test$crim - bostonPLS.pred)^2)
+
+methods <- c("LM", "Ridge", "Lasso", "Fwd Stepwise", "Back Stepwise", "PCR", "PLS")
+kable(cbind(bostonlm.mse, bostonRidge.mse, bostonLasso.mse, 
+            bostonFwd.mse, bostonBack.mse, bostonPCR.mse, bostonPLS.mse), 
+      col.names = methods, caption = "MSE by Method")
+```
+
+**Part C:** Does your chosen model involve all of the features in the data set? Why or why not?
+
+**Results:** No, the Lasso model does not involve all predictors. As we can see below, *age* and *tax* are not included in the model as shown by the 0 coefficient estimates.
+
+```{r}
+predict(boston.lasso, s = boston.lambda2, type = "coefficients")
+```

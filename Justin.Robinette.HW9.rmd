@@ -1,0 +1,604 @@
+---
+title: "Homework #9"
+author: "Justin Robinette"
+date: "March 26, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+# install.packages("gam")
+# install.packages("visreg")
+library(ISLR)        #datasets
+library(MASS)        #Boston data set
+library(boot)        #bootstrap resampling
+library(knitr)       #kable
+library(leaps)       #regsubsets
+library(gam)         #generalized additive model
+library(splines)     #spline functions
+library(ggplot2)     #visualization
+library(gridExtra)   #visualization
+library(visreg)      #visualization for regression
+library(reshape2)    #manipulation
+```
+
+**Question 7.9.6, pg 299:** In this exercise, you will further analyze the **Wage** data set considered throughout this chapter. 
+
+**Part A:** Perform polynomial regression to predict *wage* using *age*. Use cross-validation to select the optimal degree *d* for the polynomial. What degree was chosen and how does this compare to the results of hypothesis testing using ANOVA? Make a plot of the resulting polynomial fit to the data.
+
+**Results:** Here I first used cross-validation to select the optimal *d* for the polynomial of the predictor *age*. As we can see below from the plot, the optimal degree was determined to be 9 (denoted by the green point). I made a plot of the resulting polynomial fit to the data using this 9th degree polynomial. Aside from the high wage outliers, the line fits the data pretty well. 
+
+Next, I used ANOVA to determine the optimal degree *d* to see if it matches the results from the cross-validation. As we can see from the table below, the 2nd, 3rd and 9th degree polynomials are best according to the p-values. Because the p-value of the 2nd degree polynomial is the lowest, I will use this *d* for the plot.
+
+Lastly, per the instructions, I made a plot of the resulting polynomial fit to the data. The blue line represents the prediction, by age, of wage. As we can see, aside from some high wage outliers, the line appears to fit the data ok considering the wide range at each age. Analogous ggplots are included per homework instructions. 
+
+```{r}
+data(Wage, package = "ISLR")
+set.seed(702)
+
+# use cross-validation to select the optimal degree of the polynomial
+cv.err <- rep(NA, 10)
+for (i in 1:length(cv.err)) {
+  glm.fit <- glm(wage ~ poly(age, i), data = Wage)
+  cv.err[i] <- cv.glm(Wage, glm.fit, K = 10)$delta[1]
+}
+paste("The optimal degree (d) for the polynomial, from cross-validation, is:",which.min(cv.err))
+plot(cv.err, xlab = "Degree", ylab = "Test MSE", type = 'b')
+points(which.min(cv.err), cv.err[which.min(cv.err)], col = "green", pch = 20)
+
+# analogous ggplot included
+ggplot(as.data.frame(cbind(1:10, cv.err)), aes(x = 1:10, y = cv.err)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() + 
+  labs(x = "Degree", y = "Test MSE", title = "Test MSE by Polynomial Degree\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks = pretty(1:10))
+
+# plot optimal polynomial degree fit from cv
+cvfit.9 <- lm(wage ~ poly(age, 9), data = Wage)
+plot(wage ~ age, data = Wage, col = "grey")
+title("9th Degree Polynomial Fit")
+agelims <- range(Wage$age)
+age.grid <- seq(from = agelims[1], to = agelims[2])
+cvpred.9 <- predict(cvfit.9, newdata = list(age = age.grid))
+lines(age.grid, cvpred.9, col = "blue", lwd = 3)
+  
+# ggplot
+ggplot() +
+  geom_point(aes(x = Wage$age, y = Wage$wage), color = "grey") +
+  geom_line(aes(age.grid, cvpred.9), color = "blue") +
+  labs(x = "age", y = "wage", title = "9th Degree Polynomial Fit\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# fit polynomials with degree 1-10 and use ANOVA to compare with above
+fit.1 <- lm(wage ~ age, data = Wage)
+fit.2 <- lm(wage ~ poly(age, 2), data = Wage)
+fit.3 <- lm(wage ~ poly(age, 3), data = Wage)
+fit.4 <- lm(wage ~ poly(age, 4), data = Wage)
+fit.5 <- lm(wage ~ poly(age, 5), data = Wage)
+fit.6 <- lm(wage ~ poly(age, 6), data = Wage)
+fit.7 <- lm(wage ~ poly(age, 7), data = Wage)
+fit.8 <- lm(wage ~ poly(age, 8), data = Wage)
+fit.9 <- lm(wage ~ poly(age, 9), data = Wage)
+fit.10 <- lm(wage ~ poly(age, 10), data = Wage)
+anova_sum <-
+  anova(fit.1, fit.2, fit.3, fit.4, fit.5, fit.6, fit.7, fit.8, fit.9, fit.10)
+kable(cbind(rownames(anova_sum), anova_sum$`Pr(>F)`), col.names = c("Degree", "P-Value"),
+      caption = "P-Value by Polynomial Degree from ANOVA")
+
+# plot the 2nd degree polynomial
+plot(wage ~ age, data = Wage, col = "grey")
+title("2nd Degree Polynomial Fit")
+agelims <- range(Wage$age)
+age.grid <- seq(from = agelims[1], to = agelims[2])
+pred.2 <- predict(fit.2, newdata = list(age = age.grid))
+lines(age.grid, pred.2, col = "blue", lwd = 3)
+
+# analogous ggplot
+ggplot() +
+  geom_point(aes(x = Wage$age, y = Wage$wage), color = "grey") +
+  geom_line(aes(age.grid, pred.2), color = "blue") +
+  labs(x = "age", y = "wage", title = "2nd Degree Polynomial Fit\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+**Part B:** Fit a step function to predict *wage* using *age* and perform cross-validation to choose the optimal number of cuts.
+
+**Results:** From the plot below, we can see that the number of cuts that minimizes the MSE is 8 (denoted by the red point).
+
+Using cuts = 8, I fit a glm with *wage* as the response and *age* as the predictor. Again, I plotted the points of wage by age and added a line that is the prediction from the glm with cuts = 8. Similar to in part A, we see that the model does a resonably decent job of predicting most of the wage values considering the wide range of wages at any given age. A comparison ggplot is added.
+
+```{r}
+set.seed(702)
+
+# use cross-validation to choose optimal number of cuts
+cv.err2 <- rep(NA, 9)
+for (i in 2:10) {
+  Wage$age.cut <- cut(Wage$age, i)
+  fit <- glm(wage ~ age.cut, data = Wage)
+  cv.err2[i] <- cv.glm(Wage, fit, K = 10)$delta[1]
+}
+paste("The optimal number of cuts, from cross-validation, is", which.min(cv.err2))
+plot(cv.err2, xlab = "Number of Cuts", ylab = "Test MSE", type = 'b')
+points(which.min(cv.err2), cv.err2[which.min(cv.err2)], col = "red", pch = 20)
+
+# analogous ggplot
+ggplot(as.data.frame(cbind(1:10, cv.err2)), aes(x = 1:10, y = cv.err2)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() + 
+  labs(x = "Number of Cuts", y = "Test MSE", title = "Test MSE by Number of Cuts\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks = pretty(1:10))
+
+# fit step function using 8 cuts and plot
+plot(wage ~ age, data = Wage, col = "grey")
+title("8 Cuts Fit")
+fit.8cuts <- glm(wage ~ cut(age, 8), data = Wage)
+pred.8cuts <- predict(fit.8cuts, newdata = list(age = age.grid))
+lines(age.grid, pred.8cuts, col = "purple", lwd = 3)
+
+# analogous ggplot
+ggplot() +
+  geom_point(aes(x = Wage$age, y = Wage$wage), color = "grey") +
+  geom_line(aes(age.grid, pred.8cuts), color = "purple") +
+  labs(x = "age", y = "wage", title = "8 Cuts Fit - ggplot") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+**Question 7.9.9, pg 299:** This question uses the variable *dis* (weighted mean of distances to five Boston employment centers) and *nox* (nitrogen oxides concentration in parts per 10 million) from the **Boston** data set. We will treat *dis* as the predictor and *nox* as the response. 
+
+**Part A:** Use the *poly()* function to fit a cubic polynomial regression to predict *nox* using *dis*. Report the regression output, and plot the resulting data and polynomial fits.
+
+**Results:** Below we see the plot of the resulting fit. As we can see from the reasonably good fit of the plot and the summary, the polynomial terms appear to be significant as predictors of *nox*. An analogous ggplot is added. 
+
+```{r}
+data(Boston, package = "MASS")
+set.seed(702)
+
+# fit the model requested
+Boston.lm <- lm(nox ~ poly(dis, 3), data = Boston)
+
+# plot resulting data and polynomial fits
+dislims <- range(Boston$dis)
+dis.grid <- seq(from = dislims[1], to = dislims[2], by = 0.1)
+Boston.pred <- predict(Boston.lm, newdata = list(dis = dis.grid))
+plot(nox ~ dis, data = Boston, col = "grey", xlab = "Mean Distance to Employment Centers", 
+     ylab = "Nitrogen Oxide Concentration (ppm)", main = "Cubic Polynomial Fit")
+lines(dis.grid, Boston.pred, col = "green", lwd = 3)
+
+# analogous ggplot
+ggplot() +
+  geom_point(aes(x = Boston$dis, y = Boston$nox), color = "grey") +
+  geom_line(aes(dis.grid, Boston.pred), color = "green") +
+  labs(x = "Mean Distance to Employment Centers", y = "Nitrogen Oxide Concentration (ppm)", 
+       title = "Cubic Polynomial Fit\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# get summary
+summary(Boston.lm)
+```
+
+**Part B:** Plot the polynomial fits for a range of different polynomial degrees (1 - 10), and report the associated residual sum of squares.
+
+**Results:** The RSS decreases as the degree of the polynomial increases, with the exception of the increase from degree 3 to 4. The minimum RSS is seen with a polynomial with degree = 10.
+
+```{r}
+# get RRS by degree and plot
+rss.err <- rep(NA, 10)
+for (i in 1:length(rss.err)) {
+  lm.fit <- lm(nox ~ poly(dis, i), data = Boston)
+  rss.err[i] <- sum(lm.fit$residuals^2)
+}
+plot(rss.err, xlab = "Degree of Polynomial", main = "RSS", type = "b")
+
+# ggplot 
+ggplot(as.data.frame(cbind(1:10, rss.err)), aes(x = 1:10, y = rss.err)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Degree of Polynomial", y = "RSS", title = "RSS by Degree of Polynomial\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks = pretty(1:10))
+
+paste("The RSS is minimized when the Degree of the Polynomial is:",which.min(rss.err))
+```
+
+**Part C:** Perform cross-validation or another approach to select the optimal degree for the polynomial, and explain your results.
+
+**Results:** As we can see from the plot and statement below, the optimal degree for the polynomial using cross-validation is 3. Analogous ggplot is added. The chart below also confirms that the lowest CV Error is found when the polynomial is 3. 
+
+```{r}
+set.seed(702)
+
+cv.err3 <- rep(NA, 10)
+for (i in 1:length(cv.err3)) {
+  glm.fit <- glm(nox ~ poly(dis, i), data = Boston)
+  cv.err3[i] <- cv.glm(Boston, glm.fit, K = 10)$delta[1]
+}
+plot(cv.err3, type = "b", xlab = "Degree", ylab = "CV Error")
+
+# ggplot
+ggplot(as.data.frame(cbind(1:10, cv.err3)), aes(x = 1:10, y = cv.err3)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Degree of Polynomial", y = "CV Error", title = "Error by Polynomial Degree\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks = pretty(1:10))
+
+kable(cbind(1:10, cv.err3), col.names = c("Degree", "Error"),
+      caption = "CV Error by Degree of Polynomial")
+paste("The optimal degree of polynomial from CV is:",which.min(cv.err3))
+```
+
+**Part D:** Use the *bs()* function to fit a regression spline to predict *nox* using *dis*. Report the output for the fit using four degrees of freedom. How did you choose the knots? Plot the resulting fit.
+
+**Results:** First, I fit a regression spline to predict *nox* using *dis*. Then I plot the resulting fit and printed the summary which shows that all terms in the spline fit are significant. As we can see from the plot, the spline fit does a reasonable job of predicting the response. Lastly, the table shows that one knot is chosen at the 50th percentile. 
+
+```{r}
+# fit regression spline using 4 df 
+spline.fit <- lm(nox ~ bs(dis, df = 4), data = Boston)
+pred.spline <- predict(spline.fit, newdata = list(dis = dis.grid))
+
+# plot results
+plot(nox ~ dis, data = Boston, col = "grey")
+lines(dis.grid, pred.spline, col = "green", lwd = 3)
+
+# ggplot
+ggplot() +
+  geom_point(aes(x = Boston$dis, y = Boston$nox), color = "grey") +
+  geom_line(aes(dis.grid, pred.spline), color = "green") +
+  labs(x = "Mean Distance to Employment Centers", y = "Nitrogren Oxide Concentration (ppm)",
+       title = "Regression Spline Fit\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# summary of results
+summary(spline.fit)
+
+# get knots
+kable(attr(bs(Boston$dis, df = 4), "knots"), col.names = "Knot",
+      caption = "Knots Chosen")
+```
+
+**Part E:** Now fit a regression spline for a range of degrees of freedom and plot the resulting fits and report the resulting RSS. Descrive the results obtained.
+
+**Results:** We can see that the RSS decreases (with the exception of when df goes from 8 to 9). The sharpest decrease in RSS takes place between df = 4 and df = 5. When df = 13, the RSS is minimized. 
+
+```{r}
+set.seed(702)
+
+# get rss by df and plot
+rss <- rep(NA, 13)
+for (i in 3:13) {
+  fit <- lm(nox ~ bs(dis, df = i), data = Boston)
+  rss[i] <- sum(fit$residuals^2)
+}
+plot(rss, xlab = "Degrees of Freedom", ylab = "RSS", type = "b")
+
+# ggplot
+ggplot(as.data.frame(cbind(1:13, rss)), aes(x = 1:13, y = rss)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Degree of Freedom", y = "RSS", 
+       title = "RSS for Regression Spline\nby Degree of Freedom\nggplot") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks = pretty(1:13))
+
+paste("The best degrees of freedom, as selected by RSS, is:",which.min(rss))
+kable(cbind(3:13, rss[3:13]), col.names = c("Degree", "RSS"),
+      caption = "RSS by Degree of Freedom of Regression Spline")
+```
+
+**Part F:** Perform cross-validation or another approach in order to select the best degrees of freedom for a regression spline on the data. Describe your results. 
+
+**Results:** Test Error is minimized when the degrees of freedom is 8. When df = 13, which was chosen in the above exercise, test error is also low relative to most of the df options in the plot.
+
+```{r}
+set.seed(702)
+
+# get error by df and plot
+cv.err4 <- rep(NA, 13)
+for (i in 3:13) {
+  fit <- glm(nox ~ bs(dis, df = i), data = Boston)
+  cv.err4[i] <- cv.glm(Boston, fit, K = 10)$delta[1]
+}
+plot(cv.err4, xlab = "Degrees of Freedom", ylab = "Test Error", type = "b")
+
+# ggplot
+ggplot(as.data.frame(cbind(1:13, cv.err4)), aes(x = 1:13, y = cv.err4)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Degree of Freedom", y = "Test Error", 
+       title = "Test Error for Regression Spline\nby Degree of Freedom - ggplot") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks = pretty(1:13))
+
+paste("The best degrees of freedom, as chosen by CV, is:",which.min(cv.err4))
+kable(cbind(3:13, cv.err4[3:13]), col.names = c("Degree", "Test Error"),
+      caption = "Test Error by Degree of Freedom of Regression Spline")
+```
+
+
+**Question 7.9.10, pg 300:** This question relates to the **College** data set.
+
+**Part A:** Split the data into a training set and a test set. Using out-of-state tuition as the response and the other variables as the predictors, perform forward stepwise selection on the training set in order to identify a satisfactory model that uses just a subset of the predictors.
+
+**Results:** After loading the dataset and splitting into train and test subsets, I performed forward stepwise selection on the training set. As we can see from the plots below, there doesn't seem to be much improvement after 9 predictors. I included the 9 predictors that we will use going forward in the table below. 
+
+```{r}
+data(College, package = "ISLR")
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(College))
+
+# set seed per instructions
+set.seed(702)
+
+train_ind <- sample(seq_len(nrow(College)), size = sample.size)
+
+# split into train and test
+College.train <- College[train_ind, ]
+College.test <- College[-train_ind, ]
+
+# forward selection
+fit.fwd <- regsubsets(Outstate ~ ., data = College.train, nvmax=ncol(College)-1, method = "forward")
+fwd.summary <- summary(fit.fwd)
+
+# plot results
+plot(fwd.summary$cp, xlab = "Number of Predictors", main = "CP", type = 'b')
+min.cp <- which.min(fwd.summary$cp)
+points(min.cp, fwd.summary$cp[min.cp], col = "blue", pch = 5, lwd = 5)
+
+plot(fwd.summary$adjr2, xlab = "Number of Predictors", main = "Adjusted R2", type = 'b')
+max.r2 <- which.max(fwd.summary$adjr2)
+points(max.r2, fwd.summary$adjr2[max.r2], col = "blue", pch = 5, lwd = 5)
+
+plot(fwd.summary$bic, xlab = "Number of Predictors", main = "BIC", type = 'b')
+min.bic <- which.min(fwd.summary$bic)
+points(min.bic, fwd.summary$bic[min.bic], col = "blue", pch = 5, lwd = 5)
+
+# ggplots
+cp_plot <-
+  ggplot(as.data.frame(cbind(1:17, fwd.summary$cp)), aes(x = 1:17, y = fwd.summary$cp)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "# of Predictors", y = "CP") +
+  scale_x_continuous(breaks = pretty(1:17))
+adjR2_plot <-
+  ggplot(as.data.frame(cbind(1:17, fwd.summary$adjr2)), aes(x = 1:17, y = fwd.summary$adjr2)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "# of Predictors", y = "Adjusted R2") +
+  scale_x_continuous(breaks = pretty(1:17))
+bic_plot <-
+  ggplot(as.data.frame(cbind(1:17, fwd.summary$bic)), aes(x = 1:17, y = fwd.summary$bic)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "# of Predictors", y = "BIC") +
+  scale_x_continuous(breaks = pretty(1:17))
+grid.arrange(cp_plot, adjR2_plot, bic_plot, ncol = 1)
+
+# summary table
+kable(cbind(which.min(fwd.summary$cp), which.max(fwd.summary$adjr2), which.min(fwd.summary$bic)),
+      col.names = c("CP", "R2", "BIC"), caption = "Optimal Predictors by Statistical Measure")
+
+# there is not much improvement after 9 predictors
+coefficients <- coef(fit.fwd, 9)
+kable(coefficients)
+```
+
+**Part B:** Fit a GAM on the training data, using out-of-state tuition as the response and the predictors selected in the previous step. Plot the results, and explain your findings.
+
+**Results:** Below I fit a GAM model on the training data using the 8 predictors outlined above. As we see from the plots below, most of the predictors appear to have a linear relationship with *Outstate*. We will examine this further in the next step of this exercise. 
+
+```{r}
+# fit gam on training data
+gam.fit <- gam(Outstate ~ Private + s(Accept,df = 2) + s(F.Undergrad,df = 2) + s(Room.Board,df = 2) +
+                 s(Personal,df = 2) + s(PhD,df = 2) + s(perc.alumni,df = 2) + s(Expend,df = 2) 
+               + s(Grad.Rate,df = 2),
+               data = College.train)
+plot(gam.fit, se = TRUE, col = "green")
+
+# ggplot
+# courtesy of https://stackoverflow.com/questions/19735149/is-it-possible-to-plot-the-smooth-components-of-a-gam-fit-with-ggplot2
+grid.arrange(visreg(gam.fit, "Private", gg = TRUE),
+             visreg(gam.fit, "Accept", gg = TRUE), ncol=2)
+grid.arrange(visreg(gam.fit, "F.Undergrad", gg = TRUE),
+             visreg(gam.fit, "Room.Board", gg = TRUE), ncol=2)
+grid.arrange(visreg(gam.fit, "Personal", gg = TRUE),
+             visreg(gam.fit, "PhD", gg = TRUE), ncol=2)
+grid.arrange(visreg(gam.fit, "perc.alumni", gg = TRUE),
+             visreg(gam.fit, "Grad.Rate", gg = TRUE), ncol=2)
+visreg(gam.fit, "Expend", gg = TRUE)
+```
+
+**Part C:** Evaluate the model obtained on the test set and explain the results obtained. 
+
+**Results:** The test error rate is better for the GAM model then for a simple linear model using the same 8 predictors.
+
+```{r}
+# get test error and report
+pred.gam <- predict(gam.fit, College.test)
+err.gam <- mean((College.test$Outstate - pred.gam)^2)
+paste("The test error rate of the gam model is:",err.gam)
+
+# compare to linear fit
+fit.lm <- lm(Outstate ~ Private + Accept + F.Undergrad + Room.Board + Personal + PhD
+               + perc.alumni + Expend + Grad.Rate,
+               data = College.train)
+pred.lm <- predict(fit.lm, College.test)
+err.lm <- mean((College.test$Outstate - pred.lm)^2)
+paste("The test error rate of the linear model is:",err.lm)
+```
+
+**Part D:** For which variables, if any, is there evidence of a non-linear relationship with the response?
+
+**Results:** There is evidence of a non-linear relationship for the response variable with *Accept*, *Personal* and *Expend* at an alpha of 0.05. 
+
+```{r}
+summary(gam.fit)
+```
+
+
+**BONUS Question 7.9.11, pg 300:** In section 7.7, it was mentioned that GAMs are generally fit using backfitting approach. The idea behind backfitting is actually quite simple. We will now explore backfitting in the context of multiple linear regression.
+
+Suppose we would like to perform multiple linear regression, but we do not have the software to do so. Instead, we only have software to perform simple linear regression. Therefore, we take the following iterative approach: we repeatedly hold all but one coefficient estimate fixed at its current value, and update only that coefficient estimate using a simple linear regression. The process is continued until convergence - that is until the coefficient estimates stop changing.
+
+We now try this out on a toy example. 
+
+**Part A:** Generate a response **Y** and two predictors **X1** and **X2** with n = 100.
+
+**Results:** First, I randomly generated the X values. Then I created \[\beta\] and \[\epsilon\] values and set Y. Then I plotted Y to confirm a result was generated. 
+
+```{r}
+set.seed(702)
+
+# get random values
+X1 <- rnorm(100)
+X2 <- rnorm(100)
+beta_0 <- runif(1, -5.0, 5.0)
+beta_1 <- runif(1, -5.0, 5.0)
+beta_2 <- runif(1, -5.0, 5.0)
+epsilon <- rnorm(100, sd = 1)
+
+# set Y equation
+Y = beta_0 + beta_1*X1 + beta_2*X2 + epsilon
+
+# plot Y
+plot(Y)
+ggplot(as.data.frame(cbind(x = 1:100, y = Y)), aes(x = 1:100, y = Y)) +
+  geom_point(size = 4, shape = 1) +
+  labs(x = "Index", y = "Y", title = "ggplot") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+**Part B:** Initialize \[\beta_1\] to take on a value of your choice. It does not matter what value you choose. 
+
+**Results:** I set betahat_1 equal to 1. 
+
+```{r, echo = TRUE}
+# set betahat_1 equal to 1
+betahat_1 <- 1
+```
+
+**Part C:** Keeping \[\beta_1\] fixed, fit the model \[Y-\beta_1X_1 = \beta_0 + \beta_2X_2 + \epsilon\]
+
+**Results:** I used the recommended code from the text and printed the value of betahat_2. 
+
+```{r}
+# fit the model from the exercise and report betahat_2
+a <- Y - betahat_1*X2
+betahat_2 <- lm(a ~ X2)$coef[2]
+paste("betahat_2 =",betahat_2)
+```
+
+**Part D:** Keeping \[\beta_2\] fixed, fit the model \[Y-\beta_2X_2 = \beta_0 + \beta_1X_1 + \epsilon\]
+
+**Results:** I used the recommended code from the text and printed the updated value for betahat_1.
+
+```{r}
+# fit the model from the exercise and report betahat_1
+a <- Y - betahat_2*X2
+betahat_1 <- lm(a ~ X1)$coef[2]
+paste("betahat_1 =",betahat_1)
+```
+
+**Part E:** Write a loop to repeat (c) and (d) 1,000 times. Report the estimates of \[\beta_0, \beta_1, \beta_2\] at each iteration of the for loop. Create a plot in which each of these values is displayed, with each beta shown in a different color.
+
+**Results:** I created a loop that iterates 1000 times. Interestingly, the beta values converged on the first iteration of the loop. The plot and table below show the convergence and the values for each of the three beta coefficient estimates. 
+
+```{r}
+set.seed(702)
+
+# create loop
+betahat_0 <- rep(0, 1000)
+betahat_1 <- rep(0, 1000)
+betahat_2 <- rep(0, 1000)
+for (i in 1:1000) {
+  a <- Y - betahat_1[i]*X1
+  betahat_2[i] <- lm(a ~ X2)$coef[2]
+  a <- Y - betahat_2[i]*X2
+  betahat_0[i] <- lm(a ~ X1)$coef[1]
+  betahat_1[i] <- lm(a ~ X1)$coef[2]
+}
+
+# create plot
+plot(betahat_0, type = "l", col = "red", lwd = 3, xlab = "Iteration", ylab = "Beta Coef Estimate",
+     ylim = c(-5, 5))
+lines(betahat_1, col = "green", lwd = 3)
+lines(betahat_2, col = "blue", lwd = 3)
+legend("bottomright", legend = c("betahat_0", "betahat_1", "betahat_2"),
+       col = c("red", "green", "blue"), lty = c(1, 1, 1))
+
+# ggplot
+df <- data.frame(Iteration = 1:1000, betahat_0, betahat_1, betahat_2)
+ggplot(data = df, aes(x = Iteration)) +
+  geom_line(aes(y = df$betahat_0), color = "red") +
+  geom_line(aes(y = df$betahat_1), color = "green") +
+  geom_line(aes(y = df$betahat_2), color = "blue") +
+  labs(y = "Beta Coefficient Estimates", title = "ggplot") +
+  scale_color_manual(name = "Beta Coef Estimate", labels = c("betahat_0", "betahat_1", "betahat_2"),
+                     values = c("red", "green", "blue")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# summary
+kable(head(df), caption = "First 6 Beta Coefficient Estimates of 1000 Iterations")
+```
+
+**Part F:** Compare your answer in (e) to the results of simply performing multiple linear regression to predict *Y* using *X1* and *X2*. Use the *abline()* function to overlay those multiple linear regression coefficient estimates on the plot obtained in (e).
+
+**Results:** The table below shows the estimates from using multiple linear regression. As we can see, the values are reasonably close to the estimates received from the loop in the previous exercise. The plot further depicts the similarities between the two methods of extracting the beta coefficient estimates. 
+
+The dashed lines represent the coefficients as estimated by the lm funciton. The solid lines represent the coefficients as estimated by the loop in Part E. The red lines correspond to the betahat_0 estimates, the green lines correspond to the betahat_1 estimates, and the blue lines correspond to the betahat_2 estimates.
+
+```{r}
+# fit multiple linear regression model
+fit.lm <- lm(Y ~ X1 + X2)
+kable(coef(fit.lm), col.names = "Beta Coefficient Estimates",
+      caption = "Estimates from Multiple Linear Regression")
+
+# create plot
+plot(betahat_0, type = "l", col = "red", lwd = 3, xlab = "Iteration", ylab = "Beta Coef Estimate",
+     ylim = c(-5, 5))
+lines(betahat_1, col = "green", lwd = 3)
+lines(betahat_2, col = "blue", lwd = 3)
+abline(h = coef(fit.lm)[1], lty = "dotted", lwd = 3, col = "red")
+abline(h = coef(fit.lm)[2], lty = "dotted", lwd = 3, col = "green")
+abline(h = coef(fit.lm)[3], lty = "dotted", lwd = 3, col = "blue")
+legend("bottomright", legend = c("betahat_0", "betahat_1", "betahat_2",
+                                 "lin.reg_beta0", "lin.reg_beta1", "lin.reg_beta2"),
+       col = c("red", "green", "blue", "red", "green", "blue"),
+       lty = c(1,1,1,3,3,3))
+# ggplot
+ggplot(data = df, aes(x = Iteration)) +
+  geom_line(aes(y = df$betahat_0), color = "red") +
+  geom_line(aes(y = df$betahat_1), color = "green") +
+  geom_line(aes(y = df$betahat_2), color = "blue") +
+  geom_hline(yintercept = coef(fit.lm)[1], lty = "dotted", col = "red") +
+  geom_hline(yintercept = coef(fit.lm)[2], lty = "dotted", col = "green") +
+  geom_hline(yintercept = coef(fit.lm)[3], lty = "dotted", col = "blue") +
+  labs(y = "Beta Coefficient Estimates", title = "ggplot") +
+  scale_color_manual(name = "Beta Coef Estimate", labels = c("betahat_0", "betahat_1", "betahat_2"),
+                     values = c("red", "green", "blue")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+**Part G:** On this data set, how many backfitting iterations were required in order to obtain a "good" approximation to the multiple regression coefficient estimates.
+
+**Results:** As we can see from the tables and calculations below, the 1st iteration was sufficient to obtain an estimate that is quite close to the estimate obtained through multiple linear regression in the exercise above. 
+
+```{r}
+kable(head(df), caption = "Beta Coefficient Estimates from Iterations")
+kable(coef(fit.lm), col.names = "Beta Coefficient Estimates",
+      caption = "Beta Estimates from Multiple Linear Regression")
+
+paste("The difference in estimates for beta 0 =",betahat_0[1]-coef(fit.lm)[1])
+paste("The difference in estimates for beta 1 =",coef(fit.lm)[2]-betahat_1[1])
+paste("The difference in estimates for beta 2 =",coef(fit.lm)[3]-betahat_2[1])
+```

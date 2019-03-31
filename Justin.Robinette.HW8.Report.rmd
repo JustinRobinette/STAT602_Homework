@@ -1,0 +1,483 @@
+---
+title: "Homework #8 - Report"
+author: "Justin Robinette"
+date: "March 19, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r}
+library(knitr)     #kable
+library(dplyr)     #data manipulation
+library(MASS)      #LDA & QDA
+library(mclust)    #mclustda discriminant analysis
+library(class)     #KNN
+library(neuralnet) #Neural Networks
+library(ggplot2)   #visualization
+library(GGally)    #visualization
+library(gridExtra) #visualization
+```
+
+**Question 4:** In the past couple of homework assignments you have used different classification methods to analyze the dataset you chose. For this homework, please write a summary report.
+
+**i) Introduction to the Dataset**
+I used the Credit Approval Data Set (https://archive.ics.uci.edu/ml/datasets/Credit+Approval) from the UCI Machine Learning Repository. This data set contains information regarding credit card applications. All attribute names and the values were changed to protect confidentiality. This makes the data set more interesting because it helps to eliminate bias that one might have based on variable names and/or the values. For example, a variable titled 'CollegeStudent' that contains 'T' and 'F' values may bias the data if one felt that college students were more likely to be declined for credit cards. 
+
+As you can see below, there is also a good mix of attribute types and some missing values that were imputed. 
+
+```{r}
+# load credit screening data set
+credit.screening <- read.table("credit-screening.data", sep = ",")
+summary(credit.screening)
+```
+
+**ii) The Question to be Addressed**
+The question that is addressed by this data set is whether the credit card application received a positive (+) or negative (-) decision. 
+
+**iii) Initial Data Cleansing**
+The first step in cleansing was to set column names. Then, the '?' values were replaced with 'NA' values. Then the 2nd and 14th columns were changed from factor values to numeric values since they are numeric. Then the response variable was changed from '+' and '-' to 'P' and 'N'. 
+
+Missing factor variables were then imputed by using a function to fill 'NA' values with the most often occuring value. Missing numeric values were then replaced with the mean value for the respective variable. Lastly, so that the data set would work with Neural Network modeling, the 9th and 10th columns were changed from 't' and 'f' to '1' and '0' values. 
+
+The summary below shows the results of these changes.
+
+```{r}
+# add column names
+colnames(credit.screening) <- c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11",
+                                "A12", "A13", "A14", "A15", "A16")
+
+# change '?' to NA for imputation
+credit.screening[credit.screening == "?"] <- NA
+
+# change numeric values listed as factors and replace '+' with 'P' for Positive
+credit.screening$A2 <- as.numeric(credit.screening$A2)
+credit.screening$A14 <- as.numeric(credit.screening$A14)
+credit.screening$A16 <- as.factor(ifelse(credit.screening$A16 == "+", 'P', 'N'))
+
+# create function from stack overflow to impute factor variables with most common (https://stackoverflow.com/questions/36377813/impute-most-frequent-categorical-value-in-all-columns-in-data-frame)
+Mode <- function(x) {
+  ux <- sort(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+i1 <- !sapply(credit.screening, is.numeric)
+
+credit.screening[i1] <- lapply(credit.screening[i1], 
+                               function(x) replace(x, is.na(x), Mode(x[!is.na(x)])))
+
+# impute NA numerical values with the mean of the respective variable
+credit.screening <-
+  credit.screening %>% mutate_if(is.numeric, funs(replace(.,is.na(.), mean(., na.rm = TRUE))))
+
+credit.screening$A9 <- ifelse(credit.screening$A9 == 't', 1, 0)
+credit.screening$A10 <- ifelse(credit.screening$A10 == 't', 1, 0)
+summary(credit.screening)
+```
+
+**iv) Initial Descriptive Analysis Completed**
+
+First, plots were created to examine the relationship between each predictor and the response variable. The following is a summary of the plots shown below.
+- A higher *A3* value indicates higher likihood toward a '+', or Positive in the credit screening
+- Observations with an 'l' for *A4* receive all Positive screening results
+- Observations with gg for *A5* receive all Positive screening results
+- For *A6*, 'cc', 'q', 'r', 'w', and 'x' result in mostly Positive screening results
+- For *A7*, 'h' and 'z' are the only values that result in mostly Positive screening results
+- A higher *A8* results in more Positive screening results
+- For both *A9* and *A10*, 't' values (True?) make a Positive screening result much better
+- For *A11*, a higher value makes a Positive result better
+- *A15* has some extreme outliers that may need to be removed for accurate modeling. 
+
+```{r}
+A1 <- ggplot(data = credit.screening, aes(x = A1, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A1", y = "Count", title = "A16 Decision by A1") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A2 <- ggplot(data = credit.screening, aes(x = A16, y = A2)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A2") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A3 <- ggplot(data = credit.screening, aes(x = A16, y = A3)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A3") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A4 <- ggplot(data = credit.screening, aes(x = A4, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A4", y = "Count", title = "A16 Decision by A4") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A5 <- ggplot(data = credit.screening, aes(x = A5, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A5", y = "Count", title = "A16 Decision by A5") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A6 <- ggplot(data = credit.screening, aes(x = A6, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A6", y = "Count", title = "A16 Decision by A6") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A7 <- ggplot(data = credit.screening, aes(x = A7, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A7", y = "Count", title = "A16 Decision by A7") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A8 <- ggplot(data = credit.screening, aes(x = A16, y = A8)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A8") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A9 <- ggplot(data = credit.screening, aes(x = A9, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A9", y = "Count", title = "A16 Decision by A9") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A10 <- ggplot(data = credit.screening, aes(x = A10, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A10", y = "Count", title = "A16 Decision by A10") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A11 <- ggplot(data = credit.screening, aes(x = A16, y = A11)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A11") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A12 <- ggplot(data = credit.screening, aes(x = A12, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A12", y = "Count", title = "A16 Decision by A12") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A13 <- ggplot(data = credit.screening, aes(x = A13, ..count..)) +
+  geom_bar(aes(fill = credit.screening$A16), position = "dodge") +
+  labs(x = "A13", y = "Count", title = "A16 Decision by A13") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A14 <- ggplot(data = credit.screening, aes(x = A16, y = A14)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A14") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+A15 <- ggplot(data = credit.screening, aes(x = A16, y = A15)) +
+  geom_boxplot(aes(fill = credit.screening$A16)) +
+  labs(title = "A16 Decision by A15") +
+  guides(fill = guide_legend(title = "Credit Screening\nDecision")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+
+grid.arrange(A1, A2, ncol = 2)
+grid.arrange(A3, A4, ncol = 2)
+grid.arrange(A5, A6, ncol = 2)
+grid.arrange(A7, A8, ncol = 2)
+grid.arrange(A9, A10, ncol = 2)
+grid.arrange(A11, A12, ncol = 2)
+grid.arrange(A13, A14, ncol = 2)
+A15
+```
+
+Next, a correlation plot was produced to further examine the correlation between the variables and the response variable (as well as correlations between predictors).
+
+```{r}
+# change factor values to integers for correlation
+credit.screening.dat <- lapply(credit.screening, as.integer)
+ggcorr(credit.screening.dat, palette = "RdBu", label = TRUE)
+```
+
+Lastly, to further examine the correlation, a correlation matrix was produced that shows the correlation between each predictor and the response variable (*A16*).
+
+After these steps, it was determined that the variables with a correlation greater than or equal to the absolute value of 0.3 would be included in the models. The variables that meet this arbitrary threshold are: *A8*, *A9*, *A10*, and *A11*. 
+
+```{r}
+# created correlation matrix for variable selection
+credit.screening.dat <- as.data.frame(lapply(credit.screening, as.integer))
+credit.cor <- round(cor(credit.screening.dat), 2)
+credit.cor[upper.tri(credit.cor)] <- ""
+credit.cor <- as.data.frame(credit.cor)
+
+# extract correlations with A16 greater than 0.3 or less than -0.3
+res <- credit.cor[16, ]
+res #variables > abs(0.3) = A8, A9, A10, A11
+```
+
+**v) Classification Methods Utilized**
+
+The following classification methods were utilized:
+- Logistic Regression
+- k-Nearest Neighbor (KNN) (k = 1, 5 and 10 were used and k = 5 had the best result)
+- Linear Discriminant Analysis (LDA)
+- Quadratic Discriminant Analysis (QDA)
+- MclustDA
+- MclustDA with EDDA
+- Neural Network
+
+**vi) Choosing the Model - Test Error / Cross Validation**
+
+For each of the methods listed above, Validation Set Approach, Leave One Out Cross-Validation (LOOCV), and 5-Fold Cross-Validation was used. The test errors of each method and each validation approach were then compiled into a table for optimal readability. 
+
+```{r, eval = FALSE}
+# set seed for reproducibility
+set.seed(702)
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(credit.screening))
+
+train_ind <- sample(seq_len(nrow(credit.screening)), size = sample.size)
+
+# split into train and test
+credit.train <- credit.screening[train_ind, ]
+credit.test <- credit.screening[-train_ind, ]
+
+# fit glm 
+credit.glm <- glm(A16 ~ A8 + A9 + A10 + A11, data = credit.train, family = binomial)
+# create prediction based on glm above
+glm.probs <- predict(credit.glm, credit.test, type = "response")
+glm.pred <- ifelse(glm.probs > 0.5, "P", "N")
+
+# fit lda
+credit.lda <- lda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for lda
+lda.pred <- predict(credit.lda, credit.test)
+
+# fit qda
+credit.qda <- qda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for qda
+qda.pred <- predict(credit.qda, credit.test)
+
+# Mclust
+credit.mclust <- MclustDA(credit.train[, 8:11], class = credit.train$A16)
+credit.mclust.sum <- summary(credit.mclust, parameters = TRUE, what = "classification",
+                             newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# Mclust with EDDA
+credit.edda <- MclustDA(credit.train[, 8:11], class = credit.train$A16,
+                        modelType = "EDDA")
+credit.edda.sum <- summary(credit.edda, parameters = TRUE, what = "classification",
+                           newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# knn model
+# get matrices of predictor and response variables
+credit.train.X <- as.matrix(credit.train[, 8:11])
+credit.test.X <- as.matrix(credit.test[, 8:11])
+credit.A16 <- as.factor(credit.train$A16)
+
+# use KNN to predict A16 with k= 5 because that was best performing on HW6
+credit.knn5 <- knn(credit.train.X, credit.test.X, credit.A16, k=5)
+
+# get confusion matrices
+glm.cf <- table(credit.test$A16, glm.pred)
+names(dimnames(glm.cf)) <- c("Observed", "Predicted")
+
+lda.cf <- table(credit.test$A16, lda.pred$class)
+names(dimnames(lda.cf)) <- c("Observed", "Predicted")
+
+qda.cf <- table(credit.test$A16, qda.pred$class)
+names(dimnames(qda.cf)) <- c("Observed", "Predicted")
+
+# using KNN k=5 because it was best performing KNN model on HW6
+knn.cf5 <- table(credit.test$A16, credit.knn5)
+names(dimnames(knn.cf5)) <- c("Observed", "Predicted")
+
+# fit model using neural networking
+credit.nn <- neuralnet(A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# summary(credit.nn)
+# credit.nn$result.matrix
+
+# create prediction based on nn above using subset of testing set and compute() function from 
+# neuralnet package
+nn.test <- subset(credit.test, select = c(A8, A9, A10, A11))
+# head(nn.test)
+nn.results <- compute(credit.nn, nn.test)
+nn.probs <- data.frame(Observed = credit.test$A16, Probability = nn.results$net.result[,2])
+nn.pred <- ifelse(nn.probs$Probability > 0.5, "P", "N")
+
+# create confusion matrix
+nn.cf <- table(credit.test$A16, nn.pred)
+names(dimnames(nn.cf)) <- c("Observed", "Predicted")
+```
+
+```{r, eval = FALSE}
+# get error rates
+glm.err <- round(((glm.cf[1,2]+glm.cf[2,1])/nrow(credit.test)*100), 4)
+lda.err <- round(((lda.cf[1,2]+lda.cf[2,1])/nrow(credit.test)*100), 4)
+qda.err <- round(((qda.cf[1,2]+qda.cf[2,1])/nrow(credit.test)*100), 4)
+mclust.err <- round(((credit.mclust.sum$tab.newdata[1,2]+credit.mclust.sum$tab.newdata[2,1])/
+                       nrow(credit.test)*100), 4)
+edda.err <- round(((credit.edda.sum$tab.newdata[1,2]+credit.edda.sum$tab.newdata[2,1])/
+                     nrow(credit.test)*100), 4)
+knn5.err <- round(((knn.cf5[1,2]+knn.cf5[2,1])/nrow(credit.test)*100), 4)
+nn.err <- round(((nn.cf[1,2]+nn.cf[2,1])/nrow(credit.test)*100), 4)
+vsa_err_sum <- rbind(glm.err, knn5.err, lda.err, qda.err, mclust.err, edda.err, nn.err)
+```
+
+Next, LOOCV was used for the 7 different methods, as requested. Depending on the modeling method, a couple different methods were used to obtain the error rate from LOOCV. Next, the error rates were saved for reporting in the final table.
+
+```{r, eval = FALSE}
+##### LOOCV #####
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# LOOCV on glm
+set.seed(702)
+loocv.glm.err <- rep(0, nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  fit.glm <- glm(formula = formula, data = credit.screening[-i, ], family = "binomial")
+  fit.pred <- ifelse(predict(fit.glm, credit.screening[i, ], type = "response") > 0.5, "P", "N")
+  loocv.glm.err[i] <- ifelse(credit.screening[i, ]$A16 == fit.pred, 0, 1)
+}
+loocv.glm.err <- round(mean(loocv.glm.err)*100, 4)
+
+# LOOCV for Neural Network
+set.seed(702)
+loocv.nn.err <- rep(0, nrow(credit.screening))
+library(plyr)
+pbar <- create_progress_bar('text')
+pbar$init(nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  loocv.nn <- neuralnet(formula = formula, data = credit.screening, linear.output = FALSE)
+  results.nn <- compute(loocv.nn, credit.screening[i, ])
+  pred.nn <- ifelse(results.nn$net.result[,2] > 0.5, "P", "N")
+  loocv.nn.err[i] <- ifelse(credit.screening[i, ]$A16 == pred.nn, 0, 1)
+  pbar$step()
+}
+loocv.nn.err <- round(mean(loocv.nn.err)*100, 4)
+
+# LOOCV for LDA 
+credit.lda.loocv <- lda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.lda.err <- round(mean(credit.lda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for QDA
+credit.qda.loocv <- qda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.qda.err <- round(mean(credit.qda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for MClustDA & MClustDA w/ EDDA
+credit.mclust <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16)
+mclust.loocv <- cvMclustDA(credit.mclust, nfold = nrow(credit.screening))
+loocv.mclust.err <- round(mclust.loocv$error*100, 4)
+
+credit.edda <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16, modelType = "EDDA")
+edda.loocv <- cvMclustDA(credit.edda, nfold = nrow(credit.screening))
+loocv.edda.err <- round(edda.loocv$error*100, 4)
+
+# LOOCV for KNN
+credit.knn.loocv <- knn.cv(as.matrix(credit.screening[, 8:11]), 
+                     cl = as.factor(credit.screening$A16), k = 5, use.all = TRUE, prob = FALSE)
+loocv.knn.err <- round(mean(credit.knn.loocv != credit.screening$A16)*100, 4)
+
+loocv_err_sum <- rbind(loocv.glm.err, loocv.knn.err, loocv.lda.err, 
+                       loocv.qda.err, loocv.mclust.err, loocv.edda.err, loocv.nn.err)
+```
+
+Lastly, 5-Fold Cross Validation was performed using a loop that iterates 5 times through each of the modeling methods to obtain the test error rate. The error rates were then compiled to add to the final summary table. 
+
+```{r, eval = FALSE}
+##### 5-fold CV #####
+set.seed (702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# randomly shuffle the data set and remove unneccessary columns
+credit.dat <- credit.screening[sample(nrow(credit.screening)),]
+credit.dat <- credit.dat[, c(8:11, 16)]
+
+# Create 5 equal size folds 
+folds <- cut(seq(1, nrow(credit.screening)), breaks = 5, labels = FALSE)
+
+# Perform 5 fold CV
+cv5.glm.err <- c()
+cv5.lda.err <- c()
+cv5.qda.err <- c()
+cv5.mclust.err <- c()
+cv5.edda.err <- c()
+cv5.nn.err <- c()
+cv5.knn.err <- c()
+for (i in 1:5){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- credit.dat[test_indeces, ]
+  train_set <- credit.dat[-test_indeces, ]
+  # logistic regression
+  glm <- glm(formula = formula, data = train_set, family = "binomial")
+  glm.prediction <- ifelse(predict(glm, test_set, type = "response") > 0.5, "P", "N")
+  cv5.glm.err[i] <- mean(test_set$A16 != glm.prediction)
+  # neural network
+  nn.5 <- neuralnet(formula = formula, data = train_set)
+  nn.test.5 <- subset(test_set, select = c(A8, A9, A10, A11))
+  nn.results.5 <- compute(nn.5, nn.test.5)
+  nn.pred.5 <- ifelse(nn.results.5$net.result[,2] > 0.5, "P", "N")
+  cv5.nn.err[i] <- mean(test_set$A16 != nn.pred.5)
+  # lda
+  lda <- lda(formula = formula, data = train_set)
+  lda.prediction <- predict(lda, test_set)
+  cv5.lda.err[i] <- mean(test_set$A16 != lda.prediction$class)
+  # qda
+  qda <- qda(formula = formula, data = train_set)
+  qda.prediction <- predict(qda, test_set)
+  cv5.qda.err[i] <- mean(test_set$A16 != qda.prediction$class)
+  # Mclust
+  mclust.5 <- MclustDA(train_set[, 1:4], class = train_set$A16)
+  mclust.5.sum <- summary(mclust.5, parameters = TRUE, what = "classification",
+                             newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.mclust.err[i] <- mclust.5.sum$err.newdata 
+  # Mclust w/ EDDA
+  edda.5 <- MclustDA(train_set[, 1:4], class = train_set$A16, modelType = "EDDA")
+  edda.5.sum <- summary(edda.5, parameters = TRUE, what = "classification", 
+                        newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.edda.err[i] <- edda.5.sum$err.newdata   
+  # knn k=5
+  knn.5 <- knn(as.matrix(train_set[, 1:4]), as.matrix(test_set[, 1:4]), 
+               as.factor(train_set$A16), k=5)
+  cv5.knn.err[i] <- mean(test_set$A16 != knn.5)
+}
+
+# format for chart
+cv5.glm.err <- round(mean(cv5.glm.err)*100, 4)
+cv5.lda.err <- round(mean(cv5.lda.err)*100, 4)
+cv5.qda.err <- round(mean(cv5.qda.err)*100, 4)
+cv5.nn.err <- round(mean(cv5.nn.err)*100, 4)
+cv5.mclust.err <- round(mean(cv5.mclust.err)*100, 4)
+cv5.edda.err <- round(mean(cv5.edda.err)*100, 4)
+cv5.knn.err <- round(mean(cv5.knn.err)*100, 4)
+
+cv5_err_sum <- rbind(cv5.glm.err, cv5.knn.err, cv5.lda.err, cv5.qda.err, 
+                     cv5.mclust.err, cv5.edda.err, cv5.nn.err)
+```
+
+
+**vii) Conclusion and Discussion**
+
+Below we see the final summary table, similar to the one that was requested. It displays the test error rate for each Method for VSA, LOOCV, and 5-Fold CV.
+
+We can see that the overall worst error rate came from the LOOCV approach with the MclustDA method. We also notice that KNN performed relatively worse than the other methods using k=5 (which was shown to be the best k in the previous homework assignments.) 
+
+The best performing methods using VSA were Logistic Reg, LDA, and Neural Network all coming in with a test error rate of *12.0192%*. The best performing methods using the LOOCV approach were Logistic Regression and LDA - each achieving a test error rate of *14.4928% (rounded to 4 decimals)*. This test error rate is also the best test error rate present in the 5-Fold CV column of the table. Here it was achieved by Logistic Regression, LDA, and Neural Network. 
+
+On the surface, these error rates are relatively high. To relate these back to the question to be addressed from *Part ii* of this report, we are able to predict the outcome of the credit application process approximately 85-87% of the time given the predictors used. 
+
+Considering the somewhat ambiguous nature of the data, due to the masking for privacy purposes, this may not be quite as bad as it seems at first glance. Even the worst performing model between the three methods, MClust DA with LOOCV, was able to accurately predict 80% of the credit decisions based on the data. 
+
+```{r, eval = FALSE}
+Method <- c("Logistic Reg", "KNN", "LDA", "QDA", "MclustDA", "MclustDA (EDDA)", 
+            "Neural Network")
+final_sum <- as.data.frame(cbind(Method, vsa_err_sum, loocv_err_sum, cv5_err_sum))
+rownames(final_sum) <- NULL
+colnames(final_sum) <- c("Method", "VSA", "LOOCV", "5-Fold CV")
+
+kable(final_sum, caption = "Test Error by Validation Approach (%)")
+```
