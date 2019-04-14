@@ -1,0 +1,1031 @@
+---
+title: "Homework #11"
+author: "Justin Robinette"
+date: "April 9, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r, warning = FALSE}
+# install.packages("e1071")
+library(ISLR)         #data
+library(knitr)        #kable
+library(dplyr)        #data manipulation
+library(MASS)         #LDA & QDA
+library(mclust)       #mclustda discriminant analysis
+library(class)        #KNN
+library(neuralnet)    #Neural Networks
+library(tree)         #regression or classification tree
+library(randomForest) #random forests
+library(gbm)          #generalized boosted models
+library(e1071)        #svms
+```
+
+**Question 9.7.2, pg 368:** We have seen that in p=2 dimensions, a linear decision boundary takes the form \[\beta_0 + \beta_1X_1 + \beta_2X_2 = 0\]. We now investigate a non-linear decision boundary. 
+
+**Part A:** Sketch the curve \[(1 + X_2)^2 + (2-X_2)^2 = 4\]
+
+**Results:** First I plotted the curve given above.
+
+```{r}
+plot(NA, NA, type = 'n', xlim = c(-4, 2), ylim = c(-1, 5), asp = 1, xlab = "X1", ylab = "X2")
+symbols(c(-1), c(2), circles = c(2), add = TRUE, inches = FALSE)
+```
+
+
+**Part B:** On your sketch, indicate the set of points for which \[(1 + X_2)^2 + (2-X_2)^2 > 4\] as well as the set of points for which \[(1 + X_2)^2 + (2-X_2)^2 <= 4\]. 
+
+**Results:** I took the plot from above and added text indicating the values that fall inside and outside of the boundary.  
+
+```{r}
+plot(NA, NA, type = 'n', xlim = c(-4, 2), ylim = c(-1, 5), asp = 1, xlab = "X1", ylab = "X2")
+symbols(c(-1), c(2), circles = c(2), add = TRUE, inches = FALSE)
+text(x = -1, y = 2, labels = "<= 4")
+text(x = -4, y = 0, labels = "> 4")
+```
+
+
+**Part C:** Suppose that a classifier assigns an observation to the blue class if \[(1 + X_1)^2 + (2-X_2)^2 > 4\] and to the red class otherwise. To what class are the following observations classified?
+- (0,0)
+- (-1,1)
+- (2,2)
+- (3,8)
+
+**Results:** First, I calculated the values of each of the points given the formula provided. As we can see, 3 of the 4 observations should fall outside of our curve based on the table shown. Only values that are less than or equal to 4 will show up in the curve.
+
+Last, I plotted our curve and added the points. As we can see, the blue points (x's) are shown to fall outside the curve with the red point falling inside the circle. The coordinates of the points are shown.
+
+```{r}
+# show calculation of each point and report
+ob1 <- (1 + 0)^2 + (2 - 0)^2
+ob2 <- (1 + -1)^2 + (2 - 1)^2
+ob3 <- (1 + 2)^2 + (2 - 2)^2
+ob4 <- (1 + 3)^2 + (2 - 8)^2
+kable(cbind(ob1, ob2, ob3, ob4), col.names = c("(0,0)", "(-1,1)", "(2,2)", "(3,8)"),
+      caption = "Values of Supplied Observations")
+
+# create plot
+plot(NA, NA, type = 'n', xlim = c(-4, 2), ylim = c(-1, 8), asp = 1, xlab = "X1", ylab = "X2")
+symbols(c(-1), c(2), circles = c(2), add = TRUE, inches = FALSE)
+points(x = 0, y = 0, pch = 4, col = "blue")
+points(x = -1, y = 1, pch = "O", col = "red")
+points(x = 2, y = 2, pch = 4, col = "blue")
+points(x = 3, y = 8, pch = 4, col = "blue")
+text(x = 0, y = 0, labels = "(0,0)", adj = -.25, col = "blue", cex = 0.7)
+text(x = -1, y = 1, labels = "(-1,1)", adj = -.25, col = "red", cex = 0.7)
+text(x = 2, y = 2, labels = "(2,2)", adj = -.25, col = "blue", cex = 0.7)
+text(x = 3, y = 8, labels = "(3,8)", adj = -.25, col = "blue", cex = 0.7)
+```
+
+
+**Part D:** Argue that while the decision boundary in (c) is not linear in terms of \[X_1\] and \[X_2\], it is linear in terms of \[X_1, X_1^2, X_2, X_2^2\].
+
+**Results:** Using algebra, we can expand the equation so that it is linear in terms of \[X_1, X_1^2, X_2, X_2^2\].
+
+\[(1 + X_1)^2 + (2-X_2)^2 > 4\]
+\[1 + 2X_1 + X_1^2 + 4 - 4X_2 + X_2^2 > 4\]
+\[X_1^2 + X_2^2 + 2X_1 - 4X_2 + 5 > 4\]
+\[X_1^2 + X_2^2 + 2X_1 - 4X_2 + 1 > 0\]
+
+
+**Question 9.7.7, pg 371:** In this problem, you will use support vector approaches in order to predict whether a given car gets high or low gas mileage based on the **auto** data set.
+
+**Part A:** Create a binary variable that takes on a 1 for cars with gas mileage above the median, and a 0 for cars with gas mileage below the median. 
+
+**Results:** I loaded the data set and created a factor variable (**mileage**) that is '1' if the vehicle's mpg is above the median. Otherwise, the factor variable is '0'. I printed the first 3 rows to show the new binary variable.
+
+```{r}
+data("Auto", package = "ISLR")
+
+# create binary variable
+Auto$mileage <- as.factor(ifelse(Auto$mpg > median(Auto$mpg), 1, 0))
+
+head(Auto, 3)
+```
+
+
+**Part B:** Fit a support vector classifier to the data with various values of *cost*, in order to predict whether a car gets high or low gas mileage. Report the cross-validation errors associated with different values of this parameter. Comment on your results.
+
+**Results:** I fit a support vector classifier using various values of cost. As we can see from the table below, the error is lowest (**0.0126282**) when cost = 1. Error is highest (**0.0764103**) when cost = 0.01.
+
+```{r}
+set.seed(702)
+
+# fit classifier with various values of cost
+tune.cost <- tune(svm, mileage ~ ., data = Auto, kernel = 'linear', 
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100)))
+linearSVM.auto <- svm(mileage ~ ., data = Auto, kernel = 'linear', cost = 0.01)
+
+# get summary
+kable(summary(tune.cost)$performances, col.names = c("Cost", "CV Error", "Dispersion"), 
+      caption = "CV Error by Cost")
+```
+
+
+**Part C:** Now repeat (b), this time using SVMs with radial and polynomial basis kernels, with different values of *gamma* and *degree* and *cost*. Comment on your results. 
+
+**Results:** Here, I repeatd the steps from the previous exercise, but using radial and polynomial for my kernel with varying gamma and degree values, respectively. I also included the same range of cost values from the prior exercise for comparison.
+
+The first table below shows the error rates for the radial kernel. As we can see, the error is lowest (**0.06115385**) when cost = 1, gamma = 1 and degree = 2.
+
+The second table below shows the error rates for the polynomial kernel. As we can see, the error rate is lowest (**0.0405128**) when cost = 1, gamma = 1 and degree = 3.
+
+The third table summarizes these error rates.
+
+```{r}
+set.seed(702)
+
+# fit classifier with various values of cost / gamma and radial kernel
+tune.radial <- tune(svm, mileage ~ ., data = Auto, kernel = 'radial', 
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100),
+                               gamma = c(1, 2, 3, 4),
+                               degree = c(2, 3, 4)))
+
+# fit classifier with various values of cost / gamma and radial kernel
+tune.poly <- tune(svm, mileage ~ ., data = Auto, kernel = 'polynomial', 
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100),
+                               gamma = c(1, 2, 3, 4),
+                               degree = c(2, 3, 4)))
+
+summary(tune.radial)
+summary(tune.poly)
+
+radialSVM.auto <- svm(mileage ~ ., data = Auto, kernel = 'radial', 
+                      cost = tune.radial$best.model$cost, 
+                      gamma = tune.radial$best.model$gamma,
+                      poly = tune.radial$best.model$degree)
+polySVM.auto <- svm(mileage ~ ., data = Auto, kernel = 'polynomial', 
+                    cost = tune.poly$best.model$cost, 
+                    gamma = tune.poly$best.model$gamma,
+                    degree = tune.poly$best.model$degree)
+
+# get summary tables
+kable(summary(tune.radial)$performances, col.names = c("Cost", "Gamma", "Degree", "CV Error", "Dispersion"), 
+      caption = "CV Error by Parameters with Radial Kernel")
+kable(summary(tune.poly)$performances, col.names = c("Cost", "Gamma", "Degree", "CV Error", "Dispersion"), 
+      caption = "CV Error by Parameters with Polynomial Kernel")
+kable(cbind(summary(tune.radial)$best.performance, summary(tune.poly)$best.performance),
+      col.names = c("Radial", "Polynomial"), caption = "Best Error Rate by Kernel")
+```
+
+
+**Part D:** Make some plots to back up your assertions in (b) and (c).
+
+**Results:** I've plotted each of the three models with **mpg** versus the predictors in **Auto** with the classification from the models.To do so, I created a function with a for loop to improve efficiency. 
+
+From the plots below, we can see that the Linear and Polynomial plots of **mpg~cylinders** are quite similar. The same can be said for the displacement, horsepower and weight plots with the Linear and Polynomial methods. The radial plots, for the most part, are quite different than the other two methods. This makes some sense because the Linear and Polynomial methods produced superior performing models, by error rate, versus the Radial SVM. 
+
+```{r}
+# create a function to plot the various results by mpg and the mileage factor
+auto.vars <- names(Auto[,2:8])
+plotSVM <- function(svm.fit, df, response, variable) {
+  for (variable in variable){
+    plot(svm.fit, Auto, as.formula(paste(response,"~",variable,sep = "")))
+  } 
+}
+
+# plot 3 models
+paste("Linear SVM Classification Plots")
+plotSVM(linearSVM.auto, Auto, "mpg", auto.vars)
+paste("Radial SVM Classification Plots")
+plotSVM(radialSVM.auto, Auto, "mpg", auto.vars)
+paste("Polynomial SVM Classification Plots")
+plotSVM(polySVM.auto, Auto, "mpg", auto.vars)
+```
+
+
+**Question 9.7.8, pg 371:** This problem involves the **OJ** data set.
+
+**Part A:** Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+
+**Results:**  Here I've split the sets per the instructions and added a table showing the breakdown. 
+
+```{r}
+data("OJ", package = "ISLR")
+set.seed(702)
+
+# create a sample size of the sample
+sample.size <- 800
+
+train_ind <- sample(seq_len(nrow(OJ)), size = sample.size)
+
+# split into train and test
+oj.train <- OJ[train_ind, ]
+oj.test <- OJ[-train_ind, ]
+
+#confirm split
+kable(as.data.frame(cbind(nrow(OJ), nrow(oj.train), nrow(oj.test))),
+      col.names = c("OJ", "Training", "Test"), caption = "# of Obs")
+```
+
+
+**Part B:** Fit a support vector classifier to the training data using *cost = 0.01*, with **Purchase** as the response and the other variables as predictors. Use **summary()** to produce summary statistics and describe the results obtained.
+
+**Results:** I fit a classifier based on the instructions. Looking at the summary, we see that, from the 800 training obs, the classifier created 446 Support Vectors. From these Support Vectors, 224 belong to the Level **CH** and 222 belong to the Level **MM**. 
+
+```{r}
+linearSVM.oj <- svm(Purchase ~ ., data = oj.train, kernel = 'linear', cost = 0.01)
+summary(linearSVM.oj)
+```
+
+
+**Part C:** What are the training and test error rates?
+
+**Results:** The training error rate is **0.1688** and the test error rate is **0.1556**. 
+
+```{r}
+# predict training set and produce confusion matrix
+predTrain.oj <- predict(linearSVM.oj, oj.train)
+ojTrain.cf <- table(oj.train$Purchase, predTrain.oj)
+names(dimnames(ojTrain.cf)) <- c("Observed", "Predicted")
+ojTrain.cf
+
+# predict test set and produce confusion matrix
+predTest.oj <- predict(linearSVM.oj, oj.test)
+ojTest.cf <- table(oj.test$Purchase, predTest.oj)
+names(dimnames(ojTest.cf)) <- c("Observed", "Predicted")
+ojTest.cf
+
+# report error rates
+errTrain.oj <- round((ojTrain.cf[1,2]+ojTrain.cf[2,1])/nrow(oj.train), 4)
+errTest.oj <- round((ojTest.cf[1,2]+ojTest.cf[2,1])/nrow(oj.test), 4)
+kable(cbind(errTrain.oj, errTest.oj), col.names = c("Train Error", "Test Error"),
+      caption = "OJ Train and Test Error Rates")
+```
+
+
+**Part D:** Use the **tune()** function to select an optimal *cost*. Consider values ranging from 0.01 to 10.
+
+**Results:** Using the tune function we see that the optimal *cost* parameter is 1. 
+
+```{r}
+set.seed(702)
+
+# fit classifier with various values of cost
+linearTune.oj <- tune(svm, Purchase ~ ., data = oj.train, kernel = 'linear', 
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10)))
+
+# report results
+paste("The optimal cost value is:",linearTune.oj$best.model$cost)
+```
+
+
+**Part E:** Compute the training and test error rates using the new value for *cost*.
+
+**Results:**  Fitting a new model using this cost parameter, we find that both the training error and test error rates decreased when changing the cost parameter from 0.01 to 1. The error rates from both training and test as well as both cost values are represented in the table below. 
+
+```{r}
+set.seed(702)
+
+# fit new model
+linearSVM.oj2 <- svm(Purchase ~ ., data = oj.train, kernel = 'linear', cost = 1)
+
+# predict training set and produce confusion matrix
+predTrain.oj2 <- predict(linearSVM.oj2, oj.train)
+ojTrain.cf2 <- table(oj.train$Purchase, predTrain.oj2)
+
+# predict test set and produce confusion matrix
+predTest.oj2 <- predict(linearSVM.oj2, oj.test)
+ojTest.cf2 <- table(oj.test$Purchase, predTest.oj2)
+
+# report error rates
+errTrain.oj2 <- round((ojTrain.cf2[1,2]+ojTrain.cf2[2,1])/nrow(oj.train), 4)
+errTest.oj2 <- round((ojTest.cf2[1,2]+ojTest.cf2[2,1])/nrow(oj.test), 4)
+oj.sum <- as.data.frame(rbind(cbind(errTrain.oj, errTest.oj), cbind(errTrain.oj2, errTest.oj2)))
+oj.sum$Cost <- c(0.01, 1)
+kable(oj.sum, col.names = c("Training Error", "Test Error", "Cost Value"), 
+      caption = "OJ Error Rates - Linear Kernel")
+```
+
+
+**Part F:** Repeat parts (b) through (e) using a support vector machine with a radial kernel. Use the default value for *gamma*.
+
+**Results:** First, from the summary of the radial kernel SVM with the cost parameter from part B, we see that the classifier created 634 Support Vectors. From these Support Vectors, 318 belong to the Level **CH** and 316 belong to the Level **MM**. 
+
+Next, I used tune to select the optimal cost value. As we can see from the output, the optimal cost parameter value is again 1. Using this parameter value, we can fit a new radial kernel SVM and make updated predictions on the training and test set. 
+
+Lastly, we compare the training and test error rates of the un-tuned SVM and the tuned SVM. As we can see, we the cost value is arbitrarily set at 0.01, the training error and test error are much higher than we saw in part c with the linear approach. After tuning, however, we see that the training and test errors actually improve from the linear approach when using radial for the kernel parameter and cost = 1. 
+
+```{r}
+set.seed(702)
+
+# fit model from b with radial and default gamma
+radialSVM.oj <- svm(Purchase ~ ., data = oj.train, kernel = 'radial', cost = 0.01)
+summary(radialSVM.oj)
+
+# get training and test error rates without optimizing cost
+predTrain.oj3 <- predict(radialSVM.oj, oj.train)
+ojTrain.cf3 <- table(oj.train$Purchase, predTrain.oj3)
+
+# predict test set and produce confusion matrix
+predTest.oj3 <- predict(radialSVM.oj, oj.test)
+ojTest.cf3 <- table(oj.test$Purchase, predTest.oj3)
+
+
+
+# fit classifier with various values of cost
+radialTune.oj <- tune(svm, Purchase ~ ., data = oj.train, kernel = 'radial', 
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10)))
+
+# report results
+paste("The optimal cost value is:",radialTune.oj$best.model$cost)
+
+
+
+# fit new model
+radialSVM.oj2 <- svm(Purchase ~ ., data = oj.train, kernel = 'radial', cost = 1)
+
+# predict training set and produce confusion matrix
+predTrain.oj4 <- predict(radialSVM.oj2, oj.train)
+ojTrain.cf4 <- table(oj.train$Purchase, predTrain.oj4)
+
+# predict test set and produce confusion matrix
+predTest.oj4 <- predict(radialSVM.oj2, oj.test)
+ojTest.cf4 <- table(oj.test$Purchase, predTest.oj4)
+
+
+
+# report error rates
+errTrain.oj3 <- round((ojTrain.cf3[1,2]+ojTrain.cf3[2,1])/nrow(oj.train), 4)
+errTest.oj3 <- round((ojTest.cf3[1,2]+ojTest.cf3[2,1])/nrow(oj.test), 4)
+errTrain.oj4 <- round((ojTrain.cf4[1,2]+ojTrain.cf4[2,1])/nrow(oj.train), 4)
+errTest.oj4 <- round((ojTest.cf4[1,2]+ojTest.cf4[2,1])/nrow(oj.test), 4)
+
+radialSum.oj <- as.data.frame(rbind(cbind(errTrain.oj3, errTest.oj3), cbind(errTrain.oj4, errTest.oj4)))
+radialSum.oj$Cost <- c(0.01, 1)
+kable(radialSum.oj, col.names = c("Training Error", "Test Error", "Cost Value"), 
+      caption = "OJ Error Rates - Radial Kernel")
+```
+
+
+**Part G:** Repeat parts (b) through (e) using a support vector machine with a polynomial kernel. Set *degree = 2*.
+
+**Results:**  First, from the summary of the polynomial kernel SVM with the cost parameter from part B and degree = 2, we see that the classifier created 635 Support Vectors. From these Support Vectors, 319 belong to the Level **CH** and 316 belong to the Level **MM**. 
+
+Next, I used tune to select the optimal cost value. As we can see from the output, the optimal cost parameter value is 10. Using this parameter value, we can fit a new polynomial kernel SVM and make updated predictions on the training and test set. 
+
+Lastly, we compare the training and test error rates of the un-tuned SVM and the tuned SVM. As we can see, we the cost value is arbitrarily set at 0.01, the training error and test error are much higher than we saw in part c with the linear approach. After tuning, however, we see that the training error improves and the test error gets worse when going from the linear approach to polynomial with cost = 10. 
+
+```{r}
+set.seed(702)
+
+# fit model from b with poly and degree = 2
+polySVM.oj <- svm(Purchase ~ ., data = oj.train, kernel = 'polynomial', cost = 0.01, 
+                  degree = 2)
+summary(polySVM.oj)
+
+# get training and test error rates without optimizing cost
+predTrain.oj5 <- predict(polySVM.oj, oj.train)
+ojTrain.cf5 <- table(oj.train$Purchase, predTrain.oj5)
+
+# predict test set and produce confusion matrix
+predTest.oj5 <- predict(polySVM.oj, oj.test)
+ojTest.cf5 <- table(oj.test$Purchase, predTest.oj5)
+
+
+
+# fit classifier with various values of cost
+polyTune.oj <- tune(svm, Purchase ~ ., data = oj.train, kernel = 'polynomial', degree = 2,
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10)))
+
+# report results
+paste("The optimal cost value is:",polyTune.oj$best.model$cost)
+
+
+
+# fit new model
+polySVM.oj2 <- svm(Purchase ~ ., data = oj.train, kernel = 'polynomial', cost = 10, 
+                   degree = 2)
+
+# predict training set and produce confusion matrix
+predTrain.oj6 <- predict(polySVM.oj2, oj.train)
+ojTrain.cf6 <- table(oj.train$Purchase, predTrain.oj6)
+
+# predict test set and produce confusion matrix
+predTest.oj6 <- predict(polySVM.oj2, oj.test)
+ojTest.cf6 <- table(oj.test$Purchase, predTest.oj6)
+
+
+
+# report error rates
+errTrain.oj5 <- round((ojTrain.cf5[1,2]+ojTrain.cf5[2,1])/nrow(oj.train), 4)
+errTest.oj5 <- round((ojTest.cf5[1,2]+ojTest.cf5[2,1])/nrow(oj.test), 4)
+errTrain.oj6 <- round((ojTrain.cf6[1,2]+ojTrain.cf6[2,1])/nrow(oj.train), 4)
+errTest.oj6 <- round((ojTest.cf6[1,2]+ojTest.cf6[2,1])/nrow(oj.test), 4)
+
+polySum.oj <- as.data.frame(rbind(cbind(errTrain.oj5, errTest.oj5), cbind(errTrain.oj6, errTest.oj6)))
+polySum.oj$Cost <- c(0.01, 10)
+kable(polySum.oj, col.names = c("Training Error", "Test Error", "Cost Value"), 
+      caption = "OJ Error Rates - Poylnomial Kernel")
+```
+
+
+**Part H:** Overall, which approach seems to give the best results on this data?
+
+**Results:**  Based on the three summary tables below, we can see that once the cost parameter is optimized, the radial basis kernel is producing the best misclassification rate in both the training and test sets. The polynomial basis kernel is performing the worst on the test set and the linear approach is performing the worse on the training set.
+
+```{r}
+kable(oj.sum, col.names = c("Training Error", "Test Error", "Cost Value"), 
+      caption = "OJ Error Rates - Linear Kernel")
+
+kable(radialSum.oj, col.names = c("Training Error", "Test Error", "Cost Value"), 
+      caption = "OJ Error Rates - Radial Kernel")
+
+kable(polySum.oj, col.names = c("Training Error", "Test Error", "Cost Value"), 
+      caption = "OJ Error Rates - Poylnomial Kernel")
+```
+
+
+**Question 4:** In the past couple of homework assignments you have used different classification methods to analyze the dataset you chose. For this homework, use a support vector machine to model your data. Find the test error using any/all methods. Compare the results you obtained with the result from previous homework. Did the results improve? Use the table with the previous results to compare. 
+
+**Results:** Here I performed SVM using linear, radial, and polynomial kernels. I optimized some cost, gamma, and degree parameters for the various methods. 
+
+Using these results, we can see that the Linear SVM performs the best using the VSA with a misclassification rate of **12.0192%** - which ties for the best performing method on this data set.
+
+In the LOOCV approach, the Linear SVM again performed the best, and again tied the best performing method on this data set with a misclassification rate on the test set of **14.4928%**. The same is true for the 5-Fold CV approach.
+
+Across the board, each of these SVMs performed very well in relation to the other models that I have tried this semester on this data set. 
+
+```{r}
+# load credit screening data set
+credit.screening <- read.table("credit-screening.data", sep = ",")
+
+# add column names
+colnames(credit.screening) <- c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11",
+                                "A12", "A13", "A14", "A15", "A16")
+
+# change '?' to NA for imputation
+credit.screening[credit.screening == "?"] <- NA
+
+# change numeric values listed as factors and replace '+' with 'P' for Positive
+credit.screening$A2 <- as.numeric(credit.screening$A2)
+credit.screening$A14 <- as.numeric(credit.screening$A14)
+credit.screening$A16 <- as.factor(ifelse(credit.screening$A16 == "+", 'P', 'N'))
+
+# create function from stack overflow to impute factor variables with most common (https://stackoverflow.com/questions/36377813/impute-most-frequent-categorical-value-in-all-columns-in-data-frame)
+Mode <- function(x) {
+  ux <- sort(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+i1 <- !sapply(credit.screening, is.numeric)
+
+credit.screening[i1] <- lapply(credit.screening[i1], 
+                               function(x) replace(x, is.na(x), Mode(x[!is.na(x)])))
+
+# impute NA numerical values with the mean of the respective variable
+credit.screening <-
+  credit.screening %>% mutate_if(is.numeric, funs(replace(.,is.na(.), mean(., na.rm = TRUE))))
+
+credit.screening$A9 <- ifelse(credit.screening$A9 == 't', 1, 0)
+credit.screening$A10 <- ifelse(credit.screening$A10 == 't', 1, 0)
+```
+
+```{r}
+##### VSA #####
+# set seed for reproducibility
+set.seed(702)
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(credit.screening))
+
+train_ind <- sample(seq_len(nrow(credit.screening)), size = sample.size)
+
+# split into train and test
+credit.train <- credit.screening[train_ind, ]
+credit.test <- credit.screening[-train_ind, ]
+
+# fit glm 
+credit.glm <- glm(A16 ~ A8 + A9 + A10 + A11, data = credit.train, family = binomial)
+# create prediction based on glm above
+glm.probs <- predict(credit.glm, credit.test, type = "response")
+glm.pred <- ifelse(glm.probs > 0.5, "P", "N")
+
+# fit lda
+credit.lda <- lda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for lda
+lda.pred <- predict(credit.lda, credit.test)
+
+# fit qda
+credit.qda <- qda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for qda
+qda.pred <- predict(credit.qda, credit.test)
+
+# Mclust
+credit.mclust <- MclustDA(credit.train[, 8:11], class = credit.train$A16)
+credit.mclust.sum <- summary(credit.mclust, parameters = TRUE, what = "classification",
+                             newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# Mclust with EDDA
+credit.edda <- MclustDA(credit.train[, 8:11], class = credit.train$A16,
+                        modelType = "EDDA")
+credit.edda.sum <- summary(credit.edda, parameters = TRUE, what = "classification",
+                           newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# knn model
+# get matrices of predictor and response variables
+credit.train.X <- as.matrix(credit.train[, 8:11])
+credit.test.X <- as.matrix(credit.test[, 8:11])
+credit.A16 <- as.factor(credit.train$A16)
+
+# use KNN to predict A16 with k= 5 because that was best performing on HW6
+credit.knn5 <- knn(credit.train.X, credit.test.X, credit.A16, k=5)
+
+# get confusion matrices
+glm.cf <- table(credit.test$A16, glm.pred)
+names(dimnames(glm.cf)) <- c("Observed", "Predicted")
+
+lda.cf <- table(credit.test$A16, lda.pred$class)
+names(dimnames(lda.cf)) <- c("Observed", "Predicted")
+
+qda.cf <- table(credit.test$A16, qda.pred$class)
+names(dimnames(qda.cf)) <- c("Observed", "Predicted")
+
+# using KNN k=5 because it was best performing KNN model on HW6
+knn.cf5 <- table(credit.test$A16, credit.knn5)
+names(dimnames(knn.cf5)) <- c("Observed", "Predicted")
+
+# fit model using neural networking
+credit.nn <- neuralnet(A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# summary(credit.nn)
+# credit.nn$result.matrix
+
+# create prediction based on nn above using subset of testing set and compute() function from 
+# neuralnet package
+nn.test <- subset(credit.test, select = c(A8, A9, A10, A11))
+# head(nn.test)
+nn.results <- compute(credit.nn, nn.test)
+nn.probs <- data.frame(Observed = credit.test$A16, Probability = nn.results$net.result[,2])
+nn.pred <- ifelse(nn.probs$Probability > 0.5, "P", "N")
+
+# create confusion matrix
+nn.cf <- table(credit.test$A16, nn.pred)
+names(dimnames(nn.cf)) <- c("Observed", "Predicted")
+
+# get error rates
+glm.err <- round(((glm.cf[1,2]+glm.cf[2,1])/nrow(credit.test)*100), 4)
+lda.err <- round(((lda.cf[1,2]+lda.cf[2,1])/nrow(credit.test)*100), 4)
+qda.err <- round(((qda.cf[1,2]+qda.cf[2,1])/nrow(credit.test)*100), 4)
+mclust.err <- round(((credit.mclust.sum$tab.newdata[1,2]+credit.mclust.sum$tab.newdata[2,1])/
+                       nrow(credit.test)*100), 4)
+edda.err <- round(((credit.edda.sum$tab.newdata[1,2]+credit.edda.sum$tab.newdata[2,1])/
+                     nrow(credit.test)*100), 4)
+knn5.err <- round(((knn.cf5[1,2]+knn.cf5[2,1])/nrow(credit.test)*100), 4)
+nn.err <- round(((nn.cf[1,2]+nn.cf[2,1])/nrow(credit.test)*100), 4)
+vsa_err_sum <- rbind(glm.err, knn5.err, lda.err, qda.err, mclust.err, edda.err, nn.err)
+```
+
+```{r}
+set.seed(702)
+# tree method vsa
+tree.credit <- tree(A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+tree.pred <- predict(tree.credit, credit.test, type = "class")
+
+# get confusion matrix
+tree.cf <- table(credit.test$A16, tree.pred)
+names(dimnames(tree.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+tree.err <- round(((tree.cf[1,2]+tree.cf[2,1])/nrow(credit.test)*100), 4)
+
+
+# bagging method vsa
+bag.credit <- randomForest(A16 ~ A8 + A9 + A10 + A11, data = credit.train, mtry = 4, 
+                           ntree = 1000, importance = TRUE)
+bag.pred <- predict(bag.credit, credit.test, n.trees = 1000, type = "class")
+
+# get confusion matrix
+bag.cf <- table(credit.test$A16, bag.pred)
+names(dimnames(bag.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+bag.err <- round(((bag.cf[1,2]+bag.cf[2,1])/nrow(credit.test)*100), 4)
+
+
+# rf method vsa
+rf.credit <- randomForest(A16 ~ A8 + A9 + A10 + A11, data = credit.train, ntree = 1000,
+                          importance = TRUE)
+rf.pred <- predict(rf.credit, credit.test, n.trees = 1000, type = "class")
+
+# get confusion matrix
+rf.cf <- table(credit.test$A16, rf.pred)
+names(dimnames(rf.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+rf.err <- round(((rf.cf[1,2]+rf.cf[2,1])/nrow(credit.test)*100), 4)
+
+
+# boosting method vsa
+credit.boost.train <- credit.train
+credit.boost.train$A16 <- ifelse(credit.boost.train$A16 == "P", 1, 0)
+credit.boost.test <- credit.test
+credit.boost.test$A16 <- ifelse(credit.boost.test$A16 == "P", 1, 0)
+
+boost.credit <- gbm(A16 ~ A8 + A9 + A10 + A11, data = credit.boost.train,
+                    distribution = "bernoulli", n.trees = 1000, 
+                    interaction.depth = 4)
+boost.probs <- predict(boost.credit, credit.boost.test, n.trees = 1000,
+                      type = "response")
+boost.pred <- ifelse(boost.probs > 0.5, "P", "N")
+
+# get confusion matrix
+boost.cf <- table(credit.test$A16, boost.pred)
+names(dimnames(boost.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+boost.err <- round(((boost.cf[1,2]+boost.cf[2,1])/nrow(credit.test)*100), 4)
+
+# get vsa summary of misclassification rates
+vsa_err_sum <- rbind(vsa_err_sum, tree.err, bag.err, rf.err, boost.err)
+```
+
+```{r}
+set.seed(702)
+# fit classifier with various values of cost
+creditTune.cost <- tune(svm, A16 ~ A8 + A9 + A10 + A11, data = credit.train, 
+                        kernel = 'linear',
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10)))
+
+# fit classifier with various values of cost and radial kernel
+creditTune.radial <- tune(svm, A16 ~ A8 + A9 + A10 + A11, data = credit.train, 
+                          kernel = 'radial', 
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10),
+                 gamma = 0.5, 1, 2, 3, 4, 5))
+
+# fit classifier with various values of cost and polynomial kernel
+creditTune.poly <- tune(svm, A16 ~ A8 + A9 + A10 + A11, data = credit.train, 
+                        kernel = 'polynomial',
+                 ranges = list(cost = c(0.01, 0.1, 1, 5, 10),
+                               degree = c(2, 3, 4, 5)))
+
+#### GETTING BEST PARAMETERS #### 
+# creditTune.cost$best.model$cost
+# creditTune.radial$best.model$cost
+# creditTune.radial$best.model$gamma
+# creditTune.poly$best.model$cost
+# creditTune.poly$best.model$degree
+
+
+# fit models with best cost value
+linearSVM.credit <- svm(A16 ~ A8 + A9 + A10 + A11, data = credit.train,
+                        kernel = 'linear', cost = 0.01)
+radialSVM.credit <- svm(A16 ~ A8 + A9 + A10 + A11, data = credit.train,
+                        kernel = 'radial', cost = 0.1, gamma = 0.5)
+polySVM.credit <- svm(A16 ~ A8 + A9 + A10 + A11, data = credit.train,
+                      kernel = 'polynomial', cost = 0.1, degree = 3)
+
+
+# make predictions on credit set
+linear.pred <- predict(linearSVM.credit, credit.test)
+linear.cf <- table(credit.test$A16, linear.pred)
+
+radial.pred <- predict(radialSVM.credit, credit.test)
+radial.cf <- table(credit.test$A16, radial.pred)
+
+poly.pred <- predict(polySVM.credit, credit.test)
+poly.cf <- table(credit.test$A16, poly.pred)
+
+
+# get errors
+linear.err <- round(((linear.cf[1,2]+linear.cf[2,1])/nrow(credit.test)*100), 4)
+radial.err <- round(((radial.cf[1,2]+radial.cf[2,1])/nrow(credit.test)*100), 4)
+poly.err <- round(((poly.cf[1,2]+poly.cf[2,1])/nrow(credit.test)*100), 4)
+
+# add to table
+vsa_err_sum <- rbind(vsa_err_sum, linear.err, radial.err, poly.err)
+```
+
+```{r}
+##### LOOCV #####
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# LOOCV on glm
+set.seed(702)
+loocv.glm.err <- rep(0, nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  fit.glm <- glm(formula = formula, data = credit.screening[-i, ], family = "binomial")
+  fit.pred <- ifelse(predict(fit.glm, credit.screening[i, ], type = "response") > 0.5, "P", "N")
+  loocv.glm.err[i] <- ifelse(credit.screening[i, ]$A16 == fit.pred, 0, 1)
+}
+loocv.glm.err <- round(mean(loocv.glm.err)*100, 4)
+
+# LOOCV for Neural Network
+set.seed(702)
+loocv.nn.err <- rep(0, nrow(credit.screening))
+library(plyr)
+pbar <- create_progress_bar('text')
+pbar$init(nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  loocv.nn <- neuralnet(formula = formula, data = credit.screening, linear.output = FALSE)
+  results.nn <- compute(loocv.nn, credit.screening[i, ])
+  pred.nn <- ifelse(results.nn$net.result[,2] > 0.5, "P", "N")
+  loocv.nn.err[i] <- ifelse(credit.screening[i, ]$A16 == pred.nn, 0, 1)
+  pbar$step()
+}
+loocv.nn.err <- round(mean(loocv.nn.err)*100, 4)
+
+# LOOCV for LDA 
+credit.lda.loocv <- lda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.lda.err <- round(mean(credit.lda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for QDA
+credit.qda.loocv <- qda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.qda.err <- round(mean(credit.qda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for MClustDA & MClustDA w/ EDDA
+credit.mclust <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16)
+mclust.loocv <- cvMclustDA(credit.mclust, nfold = nrow(credit.screening))
+loocv.mclust.err <- round(mclust.loocv$error*100, 4)
+
+credit.edda <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16, modelType = "EDDA")
+edda.loocv <- cvMclustDA(credit.edda, nfold = nrow(credit.screening))
+loocv.edda.err <- round(edda.loocv$error*100, 4)
+
+# LOOCV for KNN
+credit.knn.loocv <- knn.cv(as.matrix(credit.screening[, 8:11]), 
+                     cl = as.factor(credit.screening$A16), k = 5, use.all = TRUE, prob = FALSE)
+loocv.knn.err <- round(mean(credit.knn.loocv != credit.screening$A16)*100, 4)
+
+loocv_err_sum <- rbind(loocv.glm.err, loocv.knn.err, loocv.lda.err, 
+                       loocv.qda.err, loocv.mclust.err, loocv.edda.err, loocv.nn.err)
+```
+
+```{r}
+set.seed(702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+loocv.tree.err <- c()
+loocv.bag.err <- c()
+loocv.rf.err <- c()
+loocv.boost.err <- c()
+credit.boost <- credit.screening
+credit.boost$A16 <- ifelse(credit.boost$A16 == "P", 1, 0)
+for (i in 1:nrow(credit.screening)) {
+  # tree LOOCV
+  tree.loocv <- tree(formula = formula, data = credit.screening[-i,])
+  tree.loocv.pred <- predict(tree.loocv, credit.screening[i,], type = "class")
+  loocv.tree.err[i] <- ifelse(credit.screening[i, ]$A16 == tree.loocv.pred, 0, 1)
+  
+  # bagging LOOCV
+  bag.loocv <- randomForest(formula, data = credit.screening[-i,], mtry = 4,
+                            ntree = 1000, importance = TRUE)
+  bag.loocv.pred <- predict(bag.loocv, credit.screening[i,], n.tree = 1000,
+                            type = "class")
+  loocv.bag.err[i] <- ifelse(credit.screening[i, ]$A16 == bag.loocv.pred, 0 , 1)
+  
+  # randomForest LOOCV
+  rf.loocv <- randomForest(formula, data = credit.screening[-i,], ntree = 1000,
+                           importance = TRUE)
+  rf.loocv.pred <- predict(rf.loocv, credit.screening[i,], n.tree = 1000,
+                           type = "class")
+  loocv.rf.err[i] <- ifelse(credit.screening[i,]$A16 == rf.loocv.pred, 0, 1)
+  
+  #boosting LOOCV
+  boost.loocv <- gbm(formula = formula, data = credit.boost[-i,],
+                     distribution = "bernoulli", n.trees = 1000,
+                     interaction.depth = 4)
+  boost.loocv.pred <- ifelse(predict(boost.loocv, credit.boost[i,],
+                                     n.trees = 1000, type = "response")
+                             > 0.5, "P", "N")
+  loocv.boost.err[i] <- ifelse(credit.screening[i,]$A16 == boost.loocv.pred, 0, 1)
+}
+
+loocv.tree.err <- round(mean(loocv.tree.err)*100, 4)
+loocv.bag.err <- round(mean(loocv.bag.err)*100, 4)
+loocv.rf.err <- round(mean(loocv.rf.err)*100, 4)
+loocv.boost.err <- round(mean(loocv.boost.err)*100, 4)
+
+# add to loocv error sum
+loocv_err_sum <- rbind(loocv_err_sum, loocv.tree.err, loocv.bag.err, loocv.rf.err,
+                       loocv.boost.err)
+```
+
+```{r}
+set.seed(702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+loocv.linear.err <- c()
+loocv.radial.err <- c()
+loocv.poly.err <- c()
+for (i in 1:nrow(credit.screening)) {
+  # linear LOOCV
+  linear.loocv <- svm(formula = formula, data = credit.screening[-i,], kernel = 'linear',
+                      cost = 0.01)
+  linear.loocv.pred <- predict(linear.loocv, credit.screening[i,])
+  loocv.linear.err[i] <- ifelse(credit.screening[i, ]$A16 == linear.loocv.pred, 0, 1)
+  
+  # radial LOOCV
+  radial.loocv <- svm(formula, data = credit.screening[-i,], kernel = 'radial',
+                            cost = 0.1, gamma = 0.5)
+  radial.loocv.pred <- predict(radial.loocv, credit.screening[i,])
+  loocv.radial.err[i] <- ifelse(credit.screening[i, ]$A16 == radial.loocv.pred, 0 , 1)
+  
+  # poly LOOCV
+  poly.loocv <- svm(formula, data = credit.screening[-i,], kernel = 'polynomial',
+                            cost = 0.1, degree = 3)
+  poly.loocv.pred <- predict(poly.loocv, credit.screening[i,])
+  loocv.poly.err[i] <- ifelse(credit.screening[i,]$A16 == poly.loocv.pred, 0, 1)
+}
+
+loocv.linear.err <- round(mean(loocv.linear.err)*100, 4)
+loocv.radial.err <- round(mean(loocv.radial.err)*100, 4)
+loocv.poly.err <- round(mean(loocv.poly.err)*100, 4)
+
+# add to loocv error sum
+loocv_err_sum <- rbind(loocv_err_sum, loocv.linear.err, loocv.radial.err, loocv.poly.err)
+```
+
+```{r}
+##### 5-fold CV #####
+set.seed (702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# randomly shuffle the data set and remove unneccessary columns
+credit.dat <- credit.screening[sample(nrow(credit.screening)),]
+credit.dat <- credit.dat[, c(8:11, 16)]
+
+# Create 5 equal size folds 
+folds <- cut(seq(1, nrow(credit.screening)), breaks = 5, labels = FALSE)
+
+# Perform 5 fold CV
+cv5.glm.err <- c()
+cv5.lda.err <- c()
+cv5.qda.err <- c()
+cv5.mclust.err <- c()
+cv5.edda.err <- c()
+cv5.nn.err <- c()
+cv5.knn.err <- c()
+for (i in 1:5){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- credit.dat[test_indeces, ]
+  train_set <- credit.dat[-test_indeces, ]
+  # logistic regression
+  glm <- glm(formula = formula, data = train_set, family = "binomial")
+  glm.prediction <- ifelse(predict(glm, test_set, type = "response") > 0.5, "P", "N")
+  cv5.glm.err[i] <- mean(test_set$A16 != glm.prediction)
+  # neural network
+  nn.5 <- neuralnet(formula = formula, data = train_set)
+  nn.test.5 <- subset(test_set, select = c(A8, A9, A10, A11))
+  nn.results.5 <- compute(nn.5, nn.test.5)
+  nn.pred.5 <- ifelse(nn.results.5$net.result[,2] > 0.5, "P", "N")
+  cv5.nn.err[i] <- mean(test_set$A16 != nn.pred.5)
+  # lda
+  lda <- lda(formula = formula, data = train_set)
+  lda.prediction <- predict(lda, test_set)
+  cv5.lda.err[i] <- mean(test_set$A16 != lda.prediction$class)
+  # qda
+  qda <- qda(formula = formula, data = train_set)
+  qda.prediction <- predict(qda, test_set)
+  cv5.qda.err[i] <- mean(test_set$A16 != qda.prediction$class)
+  # Mclust
+  mclust.5 <- MclustDA(train_set[, 1:4], class = train_set$A16)
+  mclust.5.sum <- summary(mclust.5, parameters = TRUE, what = "classification",
+                             newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.mclust.err[i] <- mclust.5.sum$err.newdata 
+  # Mclust w/ EDDA
+  edda.5 <- MclustDA(train_set[, 1:4], class = train_set$A16, modelType = "EDDA")
+  edda.5.sum <- summary(edda.5, parameters = TRUE, what = "classification", 
+                        newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.edda.err[i] <- edda.5.sum$err.newdata   
+  # knn k=5
+  knn.5 <- knn(as.matrix(train_set[, 1:4]), as.matrix(test_set[, 1:4]), 
+               as.factor(train_set$A16), k=5)
+  cv5.knn.err[i] <- mean(test_set$A16 != knn.5)
+}
+
+# format for chart
+cv5.glm.err <- round(mean(cv5.glm.err)*100, 4)
+cv5.lda.err <- round(mean(cv5.lda.err)*100, 4)
+cv5.qda.err <- round(mean(cv5.qda.err)*100, 4)
+cv5.nn.err <- round(mean(cv5.nn.err)*100, 4)
+cv5.mclust.err <- round(mean(cv5.mclust.err)*100, 4)
+cv5.edda.err <- round(mean(cv5.edda.err)*100, 4)
+cv5.knn.err <- round(mean(cv5.knn.err)*100, 4)
+
+cv5_err_sum <- rbind(cv5.glm.err, cv5.knn.err, cv5.lda.err, cv5.qda.err, 
+                     cv5.mclust.err, cv5.edda.err, cv5.nn.err)
+```
+
+```{r}
+set.seed (702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# randomly shuffle the data set and remove unneccessary columns
+credit.dat <- credit.screening[sample(nrow(credit.screening)),]
+credit.dat <- credit.dat[, c(8:11, 16)]
+
+# Create 5 equal size folds 
+folds <- cut(seq(1, nrow(credit.screening)), breaks = 5, labels = FALSE)
+cv5.tree.err <- c()
+cv5.bag.err <- c()
+cv5.rf.err <- c()
+cv5.boost.err <- c()
+for (i in 1:5){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- credit.dat[test_indeces, ]
+  train_set <- credit.dat[-test_indeces, ]
+  
+  # get sets for boost
+  train_set.boost <- train_set
+  test_set.boost <- test_set
+  train_set.boost$A16 <- ifelse(train_set.boost$A16 == "P", 1, 0)
+  test_set.boost$A16 <- ifelse(test_set.boost$A16 == "P", 1, 0)
+
+  # tree k = 5
+  tree.5 <- tree(formula = formula, data = train_set)
+  tree.prediction <- predict(tree.5, test_set, type = "class")
+  cv5.tree.err[i] <- mean(test_set$A16 != tree.prediction)
+  
+  # bagging k = 5
+  bag.5 <- randomForest(formula, data = train_set, 
+                             mtry = 4, ntree = 1000, importance = TRUE)
+  bag.prediction <- predict(bag.5, test_set, n.trees = 1000, type = "class")
+  cv5.bag.err[i] <- mean(test_set$A16 != bag.prediction)
+  
+  # rf k = 5
+  rf.5 <- randomForest(formula, data = train_set, 
+                            ntree = 1000, importance = TRUE)
+  rf.prediction <- predict(rf.5, test_set, n.trees = 1000, type = "class")
+  cv5.rf.err[i] <- mean(test_set$A16 != rf.prediction)
+  
+  # boosting k = 5
+  boost.5 <- gbm(formula = formula, data = train_set.boost, 
+                 distribution = "bernoulli", n.trees = 1000,
+                 interaction.depth = 4)
+  boost.prediction <- (ifelse(predict(boost.5, test_set.boost, n.trees = 1000,
+                                      type = "response") > 0.5, "P", "N"))
+  cv5.boost.err <- mean(test_set$A16 != boost.prediction)
+}
+
+cv5.tree.err <- round(mean(cv5.tree.err)*100, 4)
+cv5.bag.err <- round(mean(cv5.bag.err)*100, 4)
+cv5.rf.err <- round(mean(cv5.rf.err)*100, 4)
+cv5.boost.err <-round(mean(cv5.boost.err)*100, 4)
+
+# compile error summary for 5-fold CV
+cv5_err_sum <- rbind(cv5_err_sum, cv5.tree.err, cv5.bag.err, cv5.rf.err,
+                     cv5.boost.err)
+```
+
+```{r}
+set.seed (702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# randomly shuffle the data set and remove unneccessary columns
+credit.dat <- credit.screening[sample(nrow(credit.screening)),]
+credit.dat <- credit.dat[, c(8:11, 16)]
+
+# Create 5 equal size folds 
+folds <- cut(seq(1, nrow(credit.screening)), breaks = 5, labels = FALSE)
+cv5.linear.err <- c()
+cv5.radial.err <- c()
+cv5.poly.err <- c()
+for (i in 1:5){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- credit.dat[test_indeces, ]
+  train_set <- credit.dat[-test_indeces, ]
+
+  # linear svm k = 5
+  linear.5 <- svm(formula, data = train_set, kernel = 'linear', cost = 0.01)
+  linear.prediction <- predict(linear.5, test_set)
+  cv5.linear.err[i] <- mean(test_set$A16 != linear.prediction)
+  
+  # radial svm k = 5
+  radial.5 <- svm(formula, data = train_set, kernel = 'radial',
+                            cost = 0.1, gamma = 0.5)
+  radial.prediction <- predict(radial.5, test_set)
+  cv5.radial.err[i] <- mean(test_set$A16 != radial.prediction)
+  
+  # polynomial svm k = 5
+  poly.5 <- svm(formula, data = train_set, kernel = 'polynomial',
+                            cost = 0.1, degree = 3)
+  poly.prediction <- predict(poly.5, test_set)
+  cv5.poly.err[i] <- mean(test_set$A16 != poly.prediction)
+  
+}
+
+cv5.linear.err <- round(mean(cv5.linear.err)*100, 4)
+cv5.radial.err <- round(mean(cv5.radial.err)*100, 4)
+cv5.poly.err <- round(mean(cv5.poly.err)*100, 4)
+
+
+# compile error summary for 5-fold CV
+cv5_err_sum <- rbind(cv5_err_sum, cv5.linear.err, cv5.radial.err, cv5.poly.err)
+```
+
+```{r}
+Method <- c("Logistic Reg", "KNN", "LDA", "QDA", "MclustDA", "MclustDA (EDDA)", 
+            "Neural Network", "Tree", "Bagging", "Random Forest", "Boosting", "Linear SVM",
+            "Radial SVM", "Polynomial SVM")
+final_sum <- as.data.frame(cbind(Method, vsa_err_sum, loocv_err_sum, cv5_err_sum))
+rownames(final_sum) <- NULL
+colnames(final_sum) <- c("Method", "VSA", "LOOCV", "5-Fold CV")
+
+kable(final_sum, caption = "Test Error by Validation Approach (%)")
+```

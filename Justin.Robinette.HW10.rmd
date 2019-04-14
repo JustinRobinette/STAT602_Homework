@@ -1,0 +1,1184 @@
+---
+title: "Homework #10"
+author: "Justin Robinette"
+date: "April 2, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F,warning=F,echo=F,fig_height=10,fig_width=7,cache = F)
+```
+
+*No collaborators for any problem*
+
+```{r, warning = FALSE}
+# install.packages("phytools")
+#install.packages("tree")
+#install.packages("ggdendro")
+#install.packages("randomForest")
+#install.packages("gbm")
+# install.packages("ape")
+library(ISLR)         #data sets
+library(knitr)        #kable
+library(phytools)     #sketch tree
+library(dplyr)        #data manipulation
+library(MASS)         #LDA & QDA
+library(mclust)       #mclustda discriminant analysis
+library(class)        #KNN
+library(neuralnet)    #Neural Networks
+library(tree)         #regression or classification tree
+library(ggplot2)      #visualization
+library(ggdendro)     #plot trees
+library(randomForest) #random forests
+library(gbm)          #generalized boosted models
+library(glmnet)       #glm with lasso
+```
+
+**Question 8.4.4, pg 332:** This question relates to the plots in Figure 8.12.
+
+**Part A:** Sketch the tree corresponding to the partition of the predictor space illustrated in the left-hand panel of Figure 8.12. The numbers inside the boxes indicate the mean of Y within each region.
+
+**Results:** Below I've "sketched" a depiction of the tree based on the left side of Figure 8.12 on pg 333 of the text. I've also included a statement showing the if, else if, else reasoning that was used to derive the image. As the instructions didn't specify a method for the sketch, I composed the drawing outside of R and then loaded the png file using knitr's **include_graphics()** function. I also used the **phytools** library to sketch it another way. Lastly, I used ggplot to make a comparable tree. 
+
+```{r}
+# Method 1
+paste("if X1 >= 1 then y_hat = 5, else if X2 >= 1 then y_hat = 15, else if X1 < 0 then y_hat = 3, else if X2 < 0 then y_hat = 10, else y_hat = 0")
+include_graphics("C:/Users/justi/Dropbox/DSU/STAT 602/Homework_10/Q4a.png")
+
+# Method 2
+require(ape)
+sketch <- read.tree(text = "(((3, (10, 0)), 15), 5);")
+plotTree(sketch)
+nodelabels(c("X1 < 1", "X2 < 1", "X1 < 0", "X2 < 0"))
+
+# Method 3
+x <- 2:6
+y <- 0:6
+df <- as.data.frame(cbind(x, y))
+ggplot(data = df, aes(x = x, y = y)) +
+  scale_x_continuous(limits = c(2, 6)) +
+  scale_y_continuous(limits = c(0,6)) +
+  geom_segment(aes(x = 3.5, y = 5.75, xend = 5.5, yend = 5.75), size = 2) +
+  geom_segment(aes(x = 5.5, y = 4, xend = 5.5, yend = 5.75), size = 2) +
+  geom_segment(aes(x = 3.5, y = 4, xend = 3.5, yend = 5.75), size = 2) +
+  geom_segment(aes(x = 2.75, y = 4, xend = 4.25, yend = 4), size = 2) +
+  geom_segment(aes(x = 2.75, y = 3, xend = 2.75, yend = 4), size = 2) +
+  geom_segment(aes(x = 4.25, y = 3, xend = 4.25, yend = 4), size = 2) +
+  geom_segment(aes(x = 2.25, y = 3, xend = 3.25, yend = 3), size = 2) +
+  geom_segment(aes(x = 2.25, y = 2, xend = 2.25, yend = 3), size = 2) +
+  geom_segment(aes(x = 3.25, y = 2, xend = 3.25, yend = 3), size = 2) +
+  geom_segment(aes(x = 2.75, y = 2, xend = 3.75, yend = 2), size = 2) +
+  geom_segment(aes(x = 2.75, y = 1, xend = 2.75, yend = 2), size = 2) +
+  geom_segment(aes(x = 3.75, y = 1, xend = 3.75, yend = 2), size = 2) +
+  annotate("text", x = 4.5, y = 6, label = "X1 < 1", size = 5) +
+  annotate("text", x = 3.5, y = 4.25, label = "X2 < 1", size = 5) +
+  annotate("text", x = 2.75, y = 3.25, label = "X1 < 0", size = 5) +
+  annotate("text", x = 3.25, y = 2.25, label = "X2 < 0", size = 5) +
+  annotate("text", x = 5.5, y = 3.9, label = "5", size = 5) +
+  annotate("text", x = 4.25, y = 2.9, label = "15", size = 5) +
+  annotate("text", x = 2.25, y = 1.9, label = "3", size = 5) +
+  annotate("text", x = 2.75, y = 0.9, label = "10", size = 5) +
+  annotate("text", x = 3.75, y = 0.9, label = "0", size = 5) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+
+**Part B:** Create a diagram similar to the left-hand panel of Figure 8.12, using the tree illustrated in the right-hand panel of the same figure. You should divide up the predictor space into the correct regions, and indicate the mean for each region. 
+
+**Results:** First, I created a blank box w/ appropriate axes labels and axes limits. Then I added partitions throughout the box to represent the split of the tree in Figure 8.12. Lastly, I added the mean values of each region per the instructions. 
+
+Per standard homework instructions, a ggplot is included. 
+
+```{r}
+# create box
+plot(NA, NA, type = 'n', xlim = c(-1, 2), ylim = c(0, 3), xlab = "X1", ylab = "X2", axes = FALSE)
+axis(side = 1, at = c(-1, 0, 1, 2))
+axis(side = 2, at = c(0, 1, 2, 3))
+# x2 < 1
+lines(x = c(-1, 2), y = c(1, 1))
+#X1 < 1
+lines(x = c(1, 1), y = c(0, 1))
+# X2 < 2
+lines(x = c(-1, 2), y = c(2, 2))
+# X1 < 0
+lines(x = c(0, 0), y = c(1, 2))
+# add numbers
+text(x = 0, y = 0.5, labels = "mean = -1.80")
+text(x = 1.5, y = 0.5, labels = "mean = 0.63")
+text(x= -0.5, y = 1.5, labels = "mean = -1.06")
+text(x = 1, y = 1.5, labels = "mean = 0.21")
+text(x = 0.5, y = 2.5, labels = "mean = 2.49")
+
+# ggplot
+x <- -1:2
+y <- 0:3
+df <- as.data.frame(cbind(x, y))
+ggplot(data = df, aes(x = x, y = y)) +
+  scale_x_continuous(limits = c(-1, 2)) +
+  scale_y_continuous(limits = c(0, 3)) +
+  geom_segment(aes(x = -1, y = 1, xend = 2, yend = 1)) +
+  geom_segment(aes(x = 1, y = 0, xend = 1, yend = 1)) +
+  geom_segment(aes(x = -1, y = 2, xend = 2, yend = 2)) +
+  geom_segment(aes(x = 0, y = 1, xend = 0, yend = 2)) +
+  annotate("text", x = 0, y = 0.5, label = "mean = -1.80") +
+  annotate("text", x = 1.5, y = 0.5, label = "mean = 0.63") +
+  annotate("text", x = -0.5, y = 1.5, label = "mean = -1.06") +
+  annotate("text", x = 1, y = 1.5, label = "mean = 0.21") +
+  annotate("text", x = 0.5, y = 2.5, label = "mean = 2.49") +
+  labs(x = "X1", y = "X2") +
+  theme_bw()
+```
+
+
+**Question 8.4.8, pg 333:** In the lab, a classification tree was applied to the **Carseats** data set after convertion **Sales** using regression trees and related approaches, treating the response as a quantitative variable.
+
+**Part A:** Split the data set into a training set and a test set.
+
+**Results:** Here I split the data set with 70% of the obs going to training and 30% going to the test data set. I printed a table with a breakdown of number of obs in each set to confirm. 
+
+```{r}
+data("Carseats", package = "ISLR")
+
+# set seed for reproducibility
+set.seed(702)
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(Carseats))
+
+train_ind <- sample(seq_len(nrow(Carseats)), size = sample.size)
+
+# split into train and test
+carseats.train <- Carseats[train_ind, ]
+carseats.test <- Carseats[-train_ind, ]
+
+#confirm split
+kable(as.data.frame(cbind(nrow(Carseats), nrow(carseats.train), nrow(carseats.test))),
+      col.names = c("Carseats", "Training", "Test"), caption = "# of Obs")
+```
+
+
+**Part B:** Fit a regression tree to the training set. Plot the tree, and interpret the results. What test MSE do you obtain?
+
+**Results:** I fit a regression tree using the training set. After plotting, we can see that the first two splits occur based on **ShelveLoc** and **Price**. My hypothesis is that these are the two most important predictors of **Sales**. This will be examined further in a later exercise. 
+
+The test MSE of the regression tree is **5.032502**, as shown in the table below. 
+
+```{r}
+# fit tree on training set
+tree.carseats <- tree(Sales ~ ., data = carseats.train)
+
+# plot
+plot(tree.carseats)
+par(xpd = TRUE)
+text(tree.carseats, cex = 0.6, srt = 90, pos = 2, pretty = 0)
+
+# ggplot
+car_data <- dendro_data(tree.carseats)
+ggplot(segment(car_data)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, size = n), 
+               color = "light green")+
+  geom_text(data = label(car_data), aes(x = x, y = y, label = label), size = 3) +
+  geom_text(data = leaf_label(car_data), aes(x = x, y = y, label = label), size = 3) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  guides(size = guide_legend(title = "# of Obs"))
+    
+# predict Sales from tree and report Test MSE
+pred.carseats <- predict(tree.carseats, newdata = carseats.test)
+carseats.tree.mse <- mean((pred.carseats - carseats.test$Sales)^2)
+kable(carseats.tree.mse, col.names = "Tree Test MSE")
+```
+
+
+**Part C:** Use cross-validation in order to determine the optimal level of tree complexity. Does pruning the tree improve the test MSE?
+
+**Results:** I used cross-validation to determine the optimal level of tree complexity. As we can see from the plots below, the optimal level is 6. 
+
+After pruning the tree to 6 terminal nodes, as shown below, the test MSE is higher **(5.852491)** than it was with the original tree **(5.032502)**. In this case, pruning to the optimal complexity did not result in an increased level of accuracy with the test data set. 
+
+```{r}
+set.seed(702)
+
+# use cross-validation
+cv.carseats <- cv.tree(tree.carseats)
+
+# plot
+plot(cv.carseats, type = 'b')
+cv.min <- cv.carseats$size[which(cv.carseats$dev == min(cv.carseats$dev))]
+points(cv.min, cv.carseats$dev[cv.min], col = 'green', cex = 5, pch = 20)
+
+# ggplot
+ggplot(as.data.frame(cbind(cv.carseats$size, cv.carseats$dev)), 
+       aes(x = cv.carseats$size, y = cv.carseats$dev)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Size of Tree", y = "CV Deviance", title = "CV Deviance by Size of Tree") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# fit pruned tree
+prune.carseats <- prune.tree(tree.carseats, best = cv.min)
+
+# plot pruned tree
+plot(prune.carseats)
+text(prune.carseats, pretty = 0)
+
+# ggplot
+prune_data <- dendro_data(prune.carseats)
+ggplot(segment(prune_data)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, size = n), 
+               color = "light green")+
+  geom_text(data = label(prune_data), aes(x = x, y = y, label = label), size = 3) +
+  geom_text(data = leaf_label(prune_data), aes(x = x, y = y, label = label), size = 3) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  guides(size = guide_legend(title = "# of Obs"))
+
+# predict Sales from pruned tree and report Test MSE
+pred.pruned.carseats <- predict(prune.carseats, newdata = carseats.test)
+carseats.pruned.mse <- mean((pred.pruned.carseats - carseats.test$Sales)^2)
+kable(cbind(carseats.tree.mse, carseats.pruned.mse), 
+      col.names = c("Tree", "Pruned Tree"), caption = "Test MSE by Tree")
+```
+
+
+**Part D:** Use the bagging approach in order to analyze the data. What test MSE do you obtain? Use the **importance()** function to determine which variables are most important.
+
+**Results:** Using bagging, we achieved a test MSE of **3.567435** which, as we can see from the table below, is considerably better than with the Tree and Pruned Tree. 
+
+The table and plot below show the importance by predictor. As we can see, the most important predictors in this model are **Price** and **ShelveLoc**.
+
+No base R plots are included as a plot was not requested. 
+
+```{r}
+set.seed(702)
+# use bagging
+bag.carseats <- randomForest(Sales ~ ., data = carseats.train, mtry = ncol(Carseats)-1, 
+                             ntree = 1000, importance = TRUE)
+
+# predict Sales and report MSE
+pred.bag <- predict(bag.carseats, newdata = carseats.test)
+carseats.bag.mse <- mean((pred.bag - carseats.test$Sales)^2)
+kable(cbind(carseats.tree.mse, carseats.pruned.mse, carseats.bag.mse),
+      col.names = c("Tree", "Pruned Tree", "Bagging"),
+      caption = "Test MSE by Method")
+
+# examine variable importance
+kable(importance(bag.carseats), caption = "Carseats Predictor Importance from Bagging")
+
+# plot the importance of each factor
+importance <- importance(bag.carseats)
+factor.importance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[ ,'%IncMSE'],2))
+ggplot(factor.importance, aes(x = Variables, y = Importance, fill = Importance)) +
+  geom_bar(stat='identity') + 
+  theme(axis.text.x = element_text(angle = 45))
+```
+
+
+**Part E:** Use random forests to analyze this data. What test MSE do you obtain? Use the **importance()** function to determine which variables are most important. Describe the effect of *m*, the number of variables considered at each split, on the error rate obtained. 
+
+**Results:** The test MSE obtain from random forest is **3.746423**.
+
+As we can see from the plots below, **Price** and **ShelveLoc** are again the most important predictors with this model. 
+
+Regarding the number of variables considered at each split **(m)** - denoted by 'mtry' in the randomForest() function, in the previous example with bagging we used 'm' (*mtry*) equal to the number of predictors (10). In this exercise, we are using the default for 'm', which is \[mtry = \sqrt{p}\] where P is the number of predictors. In bagging, as mentioned above, \[mtry = ncol(df) - 1\]. 
+
+As we can see from the table below, the MSE is lower when using bagging with 'm' = 10 **(3.567)** than it is when using the default for 'm' **(3.746)**.
+
+No base R plots are included as a plot was not requested. 
+
+```{r}
+set.seed(702)
+
+# use random forests
+rf.carseats <- randomForest(Sales ~ ., data = carseats.train, ntree = 1000, importance = TRUE)
+
+# get prediction and report error
+pred.rf <- predict(rf.carseats, newdata = carseats.test)
+carseats.rf.mse <- mean((pred.rf - carseats.test$Sales)^2)
+kable(cbind(carseats.tree.mse, carseats.pruned.mse, carseats.bag.mse, carseats.rf.mse),
+      col.names = c("Tree", "Pruned Tree", "Bagging", "Random Forest"),
+      caption = "Test MSE by Method")
+
+# examine variable importance
+kable(importance(rf.carseats), caption = "Carseats Predictor Importance from Random Forest")
+
+# plot the importance of each factor
+rf.importance <- importance(rf.carseats)
+rf.factor.importance <- data.frame(Variables = row.names(rf.importance), 
+                            Importance = round(rf.importance[ ,'%IncMSE'],2))
+ggplot(rf.factor.importance, aes(x = Variables, y = Importance, fill = Importance)) +
+  geom_bar(stat='identity') + 
+  theme(axis.text.x = element_text(angle = 45))
+```
+
+
+**Question 8.4.9, pg 334:** This problem involves the **OJ** data set which is part of the **ISLR** package.
+
+**Part A:** Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+
+**Results:** I created a training set of 800 random obs, leaving the remaining rows for the test set. I printed a breakdown of the number of obs per set to confirm. 
+
+```{r}
+data("OJ", package = "ISLR")
+set.seed(702)
+
+# create a sample size of 70% of the sample
+sample.size <- 800
+
+train_ind <- sample(seq_len(nrow(OJ)), size = sample.size)
+
+# split into train and test
+oj.train <- OJ[train_ind, ]
+oj.test <- OJ[-train_ind, ]
+
+#confirm split
+kable(as.data.frame(cbind(nrow(OJ), nrow(oj.train), nrow(oj.test))),
+      col.names = c("OJ", "Training", "Test"), caption = "# of Obs")
+```
+
+
+**Part B:** Fit a tree to the training data with **Purchase** as the response and the other variables as the predictors. Use the **summary()** function to produce summary statistics about the tree, and describe the results obtained. What is the training error rate? How many terminal nodes does the tree have?
+
+**Results:** The tree, fit from the training data set, has an training error rate of 0.16625 and 8 terminal nodes. 
+
+```{r}
+# fit model and report requested summary values
+tree.oj <- tree(Purchase ~ ., data = oj.train) 
+tree.sum <- summary(tree.oj)
+kable(cbind((tree.sum$misclass[1]/tree.sum$misclass[2]), tree.sum$size), 
+      col.names = c("Training Error Rate", "# Terminal Nodes"),
+      caption = "Summary of Tree on OJ Training Set")
+```
+
+
+**Part C:** Type in the name of the tree object in order to get a detailed text output. Pick one of the terminal nodes, and interpret the information displayed.
+
+**Results:** Below is a detailed text output of the tree. Per the instructions, I choose the first terminal node, which is denoted by the asterisk, of LoyalCH < 0.051325. The number of observations on this branch of the tree is 60. The deviance is 10.17. The overall prediction for the branch for *Purchase* is **MM**. 1.667% of the obs in this branch have a *Purchase* of **CH**. Over 98% of the obs in this branch have a *Purchase* of **MM**. 
+
+```{r}
+tree.oj
+```
+
+
+**Part D:** Create a plot of the tree, and interpret the results.
+
+**Results:** Both base R and ggplots of the tree are below for comparison. As we can see from the base R plot, the original split is based on whether the value of *LoyalCH* is < 0.50395. Since the majority of the nodes are decided by *LoyalCH*, we could postulate that this is the most important predictor of *Purchase*. The only other split occurs based on *PriceDiff*. 
+
+```{r}
+# plot
+plot(tree.oj)
+text(tree.oj, cex = 0.8, pos = 1, pretty = 0)
+
+# ggplot
+oj_data <- dendro_data(tree.oj)
+ggplot(segment(oj_data)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, size = n), 
+               color = "light green")+
+  geom_text(data = label(oj_data), aes(x = x, y = y, label = label), size = 3) +
+  geom_text(data = leaf_label(oj_data), aes(x = x, y = y, label = label), size = 3) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  guides(size = guide_legend(title = "# of Obs"))
+```
+
+
+**Part E:** Predict the response on the test data, and produce a confusion matrix comparing the test labels to the predicted test labels. What is the test error rate?
+
+**Results:** After predicting the response on the test data, I printed a confusion matrix. As we can see, the model predicted the correct response at a higher rate when the *Purchase* value was **CH**. With that being said, the confusion matrix appears to show relatively accurate predictions of the response variable.
+
+Lastly, I printed the test error rate, which is **0.1556**. Interestingly, this is worse than the error rate on the training set, which was **0.16625**.
+
+```{r}
+# predict Purchase
+pred.oj <- predict(tree.oj, oj.test, type = "class")
+
+# get confusion matrix
+oj.cf <- table(oj.test$Purchase, pred.oj)
+names(dimnames(oj.cf)) <- c("Observed", "Predicted")
+oj.cf
+
+# get error rate
+oj.tree.err <- round((oj.cf[1,2]+oj.cf[2,1])/nrow(oj.test), 4)
+kable(oj.tree.err, col.names = "Tree", caption = "Test Error Rate")
+```
+
+
+**Part F:** Apply the **cv.trees()** function to the training set in order to determine the optimal tree size.
+
+**Results:** After utilizing cv.trees() on the training set, we see that the optimal number of terminal nodes is 7. Both 7 and 8 misclassify 159 observations.  
+
+```{r}
+set.seed(702)
+
+# use cross-validation to determine best tree size
+oj.cv <- cv.tree(tree.oj, FUN = prune.misclass)
+
+# report optimal tree size
+oj.cv.min <- oj.cv$size[which(oj.cv$dev == min(oj.cv$dev))]
+kable(cbind(oj.cv.min, rbind(oj.cv$dev[1], oj.cv$dev[2])), 
+      col.names = c("# Terminal Nodes", "# of Misclassifications"),
+      caption = "Optimal Terminal Nodes for Tree based on CV")
+```
+
+
+**Part G:** Produce a plot with tree size on the x-axis and cross-validated classification error rate on the y-axis.
+
+**Results:** Below are two plots representing the misclassification rate on the y-axis and the tree size on the x-axis, per the instructions. Again we see, the misclassification rate remains level when going from 7 terminal nodes to 8 terminal nodes. 
+
+```{r}
+# plot
+plot(oj.cv, type = 'b')
+
+# ggplot
+ggplot(as.data.frame(cbind(oj.cv$size, oj.cv$dev)), 
+       aes(x = oj.cv$size, y = oj.cv$dev)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Size of Tree", y = "CV Deviance", title = "CV Deviance by Size of Tree") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+**Part H:** Which tree size corresponds to the lowest cross-validation error rate?
+
+**Results:** A tree size with 7 terminal nodes gives us the lowest cross-validation error rate with the fewest nodes, I will include that in the subsequent exercises. I will also use 5 as an alternative number, since this number is given in *Part I* if cross-validation does not lend to a selection of a pruned tree. Technically, since 7 and 8 have the same error rate and 8 represents an unpruned tree, I think it will be beneficial to look at both options. 
+
+
+**Part I:** Produce a pruned tree corresponding to the optimal tree size obtained using cross-validation. If cross-validation does not lend to selection of a pruned tree, then create a pruned tree with 5 terminal nodes.
+
+**Results:** Using best = 7, we see that 50% of the splits are based on **LoyalCH** - including the root, and 50% of the splits are derived from **PriceDiff**.
+
+With best = 5, 75% of the splits are based on **LoyalCH** with only 25% being derived from **PriceDiff**. Additionally, from this set of 2 plots using best = 5, we see that if **LoyalCH** is >= 0.50395, it classifies **Purchase** as **CH**. Otherwise, it classifies as **MM**.
+
+```{r}
+# fit pruned tree
+prune.oj7 <- prune.tree(tree.oj, best = 7)
+prune.oj5 <- prune.tree(tree.oj, best = 5)
+
+# plot pruned tree with best = 7
+plot(prune.oj7)
+text(prune.oj7, pretty = 0)
+
+# ggplot best = 7
+oj7_data <- dendro_data(prune.oj7)
+ggplot(segment(oj7_data)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, size = n), 
+               color = "light green")+
+  geom_text(data = label(oj7_data), aes(x = x, y = y, label = label), size = 3) +
+  geom_text(data = leaf_label(oj7_data), aes(x = x, y = y, label = label), size = 3) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  guides(size = guide_legend(title = "# of Obs"))
+
+# plot pruned tree with best = 5
+plot(prune.oj5)
+text(prune.oj5, pretty = 0)
+
+# ggplot best = 5
+oj5_data <- dendro_data(prune.oj5)
+ggplot(segment(oj5_data)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, size = n), 
+               color = "light green")+
+  geom_text(data = label(oj5_data), aes(x = x, y = y, label = label), size = 3) +
+  geom_text(data = leaf_label(oj5_data), aes(x = x, y = y, label = label), size = 3) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  guides(size = guide_legend(title = "# of Obs"))
+```
+
+
+**Part J:** Compare the training error rates between the pruned and unpruned trees. Which is higher?
+
+**Results:** As the below table indicates, there is no difference in the training error rates between the pruned tree at best = 7 and the unpruned tree. Both are **0.1662** with 133 of 800 obs being misclassified. When best = 5, the pruned tree performs slightly worse on the training data with an error rate of **0.2025** and 162 of 800 obs misclassified. 
+
+```{r}
+# get training error rates from the summary of pruned trees
+prune.sum7 <- summary(prune.oj7)
+prune.sum5 <- summary(prune.oj5)
+kable(cbind((tree.sum$misclass[1]/tree.sum$misclass[2]), 
+            (prune.sum7$misclass[1]/prune.sum7$misclass[2]),
+            (prune.sum5$misclass[1]/prune.sum5$misclass[2])), 
+      col.names = c("Original Tree", "Pruned Tree - best = 7", "Pruned Tree - best = 5"),
+      caption = "Error Rates on OJ Training Set")
+```
+
+
+**Part K:** Compare the test error rates between the pruned and unpruned trees. Which is higher?
+
+**Results:** Here we see, once again, that the error rates of the unpruned tree and the pruned tree with best = 7 are identical at **0.1556** while the test error rate of the pruned tree with best = 5 lags behind slightly with a test error rate of **0.1926**.
+
+```{r}
+# predict Purchase
+pred.oj.prune7 <- predict(prune.oj7, oj.test, type = "class")
+pred.oj.prune5 <- predict(prune.oj5, oj.test, type = "class")
+
+# get confusion matrix
+oj.prune.cf7 <- table(oj.test$Purchase, pred.oj.prune7)
+oj.prune.cf5 <- table(oj.test$Purchase, pred.oj.prune5)
+
+# get test error rate
+oj.prune.err7 <- round((oj.prune.cf7[1,2]+oj.prune.cf7[2,1])/nrow(oj.test), 4)
+oj.prune.err5 <- round((oj.prune.cf5[1,2]+oj.prune.cf5[2,1])/nrow(oj.test), 4)
+kable(cbind(oj.tree.err,oj.prune.err7, oj.prune.err5), 
+      col.names = c("Original Tree", "Pruned Tree - best = 7", "Pruned Tree - best = 5"), 
+      caption = "Error Rates on OJ Test Set")
+```
+
+
+**Question 8.4.10, pg 334:** We now use boosting to predict **Salary** in the **Hitters** data set.
+
+**Part A:** Remove the observations for whom the salary information is unknown, and the log-transform the salaries.
+
+**Results:** First I removed the obs from the instructions and performed the log-transformation on the **Salary** response variable. 
+
+```{r}
+data("Hitters", package = "ISLR")
+
+# remove obs with Salary = NA
+Hitters <- Hitters[!is.na(Hitters$Salary),]
+
+# log-transform Salary
+Hitters$Salary <- log(Hitters$Salary)
+
+head(Hitters)
+```
+
+
+**Part B:** Create a training set consisting of the first 200 observations and a test set consisting of the remaining observations.
+
+**Results:** I created the training and test sets per the instructions and printed the breakdown of number of obs per data set below. 
+
+```{r}
+# split into train and test
+hitters.train <- Hitters[1:200, ]
+hitters.test <- Hitters[201:nrow(Hitters), ]
+
+#confirm split
+kable(as.data.frame(cbind(nrow(Hitters), nrow(hitters.train), nrow(hitters.test))),
+      col.names = c("Hitters", "Training", "Test"), caption = "# of Obs")
+```
+
+
+**Part C:** Perform boosting on the training set with 1,000 trees for a range of values of the shrinkage parameter \[\lambda\]. Produce a plot with different shrinkage values on the x-axis and the corresponding training set MSE on the y-axis.
+
+**Results:** First, I created a sequence of values to test as my lambda values in my loop. Next, I created a loop that iterated through the sequence of values and logged the MSE from the **gbm()** function at each iteration.
+
+Below is a plot showing the MSE at these iterations. A complimentary ggplot is also shown. We can see that the MSE drops drastically before leveling off somewhat as we iterate through the shrinkage values. 
+
+```{r}
+set.seed(702)
+
+# create a sequence of lambdas for the loop
+lambda.vals <- seq(0.0001, 0.1, by = 0.001)
+
+# create loop for train and test MSE
+boost.trainMSE <- rep(NA, length(lambda.vals))
+boost.testMSE <- rep(NA, length(lambda.vals))
+for(i in 1:length(lambda.vals)) {
+  lambda <- lambda.vals[i]
+  boost.hitters <- gbm(Salary ~ ., data = hitters.train, distribution = "gaussian", n.trees = 1000,
+                       interaction.depth = 4, shrinkage = lambda)
+
+  train.pred <- predict(boost.hitters, newdata = hitters.train, n.trees = 1000)
+  boost.trainMSE[i] <- mean((train.pred - hitters.train$Salary)^2)
+  
+  test.pred <- predict(boost.hitters, newdata = hitters.test, n.trees = 1000)
+  boost.testMSE[i] <- mean((test.pred - hitters.test$Salary)^2)
+}
+
+# plot results
+plot(lambda.vals, boost.trainMSE, type = 'b', xlab = "Shrinkage Values", ylab = "Training MSE")
+
+# ggplot
+ggplot(data = as.data.frame(cbind(lambda.vals, boost.trainMSE)), 
+       aes(x = lambda.vals, y = boost.trainMSE)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Shrinkage Values", y = "Training MSE")
+```
+
+
+**Part D:** Produce a plot with different shrinkage values on the x-axis and the corresponding test set MSE on the y-axis.
+
+**Results:** Below are the plots of Test MSE by shrinkage value. At first glance, we notice that the MSE values are much less uniform than they were in the training set plots above - which is to be expected. We still see a sharp decline initially, but then we can see some variation in the MSEs as the different shrinkage values are applied. 
+
+Lastly, we see that the best test error rate is **0.2547836** which occurs at a shrinkage value \[\lambda = 0.0641\]
+
+```{r}
+set.seed(702)
+
+# plot results for test mse
+plot(lambda.vals, boost.testMSE, type = 'b', xlab = "Shrinkage Values", ylab = "Test MSE")
+
+# ggplot
+ggplot(data = as.data.frame(cbind(lambda.vals, boost.testMSE)), 
+       aes(x = lambda.vals, y = boost.testMSE)) +
+  geom_point(size = 4, shape = 1) +
+  geom_line() +
+  labs(x = "Shrinkage Values", y = "Test MSE")
+
+# check minimum error and corresponding shrinkage value
+boosting.test.err <- min(boost.testMSE)
+kable(cbind(boosting.test.err, lambda.vals[which.min(boost.testMSE)]), 
+      col.names = c("Minimum Test Error", "Corresponding Lambda"),
+      caption = "Boosting Test Error")
+```
+
+
+**Part E:** Compare the test MSE of boosting to the test MSE that results from applying two of the regression approaches seen in Chapters 3 and 6.
+
+**Results:** For the two other regression approaches from previous chapters, I chose a simple linear model and ridge regression. As we can see from the table below, boosting gives us a better MSE at **0.2547836** than linear regression **(0.4917959)** or ridge regression **(0.4525826)**.
+
+```{r}
+# linear regression from 3.6.2
+lm.fit <- lm(Salary ~ ., data = hitters.train)
+lm.pred <- predict(lm.fit, newdata = hitters.test)
+lm.err <- mean((lm.pred - hitters.test$Salary)^2)
+
+set.seed(702)
+
+# switch to matrices
+train.X <- model.matrix(Salary ~ ., data = hitters.train)
+test.X <- model.matrix(Salary ~ ., data = hitters.test)
+grid <- 10 ^ seq(10, -2, length = 100)
+
+# fit ridge regression
+fit.ridge <- cv.glmnet(train.X, hitters.train$Salary, alpha = 0, lambda = grid)
+
+# choose minimum lambda from cv model
+bestlambda <- fit.ridge$lambda.min
+
+# predict test
+pred.ridge <- predict(fit.ridge, s = bestlambda, newx = test.X)
+
+# get error rate
+ridge.err <- mean((hitters.test$Salary - pred.ridge)^2)
+
+# report error rates
+kable(cbind(lm.err, ridge.err, boosting.test.err), 
+      col.names = c("Simple Linear Regression", "Ridge Regression", "Boosting"),
+      caption = "Test MSE by Model Type")
+```
+
+
+**Part F:** Which variables appear to be the most important predictors in the boosted model?
+
+**Results:** From the table below, we can see that **CAtBat**, **CWalks**, **CRBI** and **PutOuts** are the most important predictors of **Salary** in our boosted model. Somewhat predictably, these correspond to "Number of times at bat during career", "Number of runs batter in during career", and "Number of walks during career", respectively. 
+
+The least important predictors are **League**, **Division**, and **NewLeague** which essentially all three correspond to which division of Major League Baseball you were in during the '86 and '87 seasons.
+
+```{r}
+# fit with best lambda
+hitters.boost.bestlambda <- gbm(Salary ~., data = hitters.train,
+                                distribution = "gaussian",
+                                n.trees = 1000,
+                                interaction.depth = 4,
+                                shrinkage = lambda.vals[which.min(boost.testMSE)])
+summary(hitters.boost.bestlambda)
+```
+
+
+**Part G:** Now apply bagging to the training set. What is the test set MSE for this approach?
+
+**Results:** The test set MSE for bagging is **0.2304351** which is slightly better than the boosting method **(0.2547836)**. Both bagging and boosting are considerably more effective than simple linear regression and ridge regression from chapters 3 and 6.
+
+I also included an importance plot to compare with the results from the *Part F* of this exercise. Here we see that **CAtBat** is still, by far, the best predictor of **Salary**.
+
+No base R plots are included since the question didn't request plotting. 
+
+```{r}
+set.seed(702)
+
+# use bagging
+bag.hitters <- randomForest(Salary ~ ., data = hitters.train, mtry = ncol(Hitters)-1, 
+                             ntree = 1000, importance = TRUE)
+
+# predict Sales and report MSE
+pred.bag.hitters <- predict(bag.hitters, newdata = hitters.test)
+hitters.bag.mse <- mean((pred.bag.hitters - hitters.test$Salary)^2)
+kable(cbind(lm.err, ridge.err, boosting.test.err, hitters.bag.mse), 
+      col.names = c("Simple Linear Regression", "Ridge Regression", "Boosting", "Bagging"),
+      caption = "Test MSE by Model Type")
+
+# plot the importance of each factor
+hitters.importance <- importance(bag.hitters)
+factor.importance1 <- data.frame(Variables = row.names(hitters.importance), 
+                            Importance = round(hitters.importance[ ,'%IncMSE'],2))
+ggplot(factor.importance1, aes(x = Variables, y = Importance, fill = Importance)) +
+  geom_bar(stat='identity') + 
+  theme(axis.text.x = element_text(angle = 45))
+```
+
+
+**Question 5:** In the past couple assignments you have usued different classification methods to analyze the dataset you chose. For this homework, use tree-based classification methods (tree, bagging, randomforest, boosting) to model your data. Find the test error using any/all methods (VSA, K-fold CV, LOOCV). Compare the results you obtained with the result from previous homework. Did the results improve? Use the table you previously made to compare.
+
+**Results:** The table below represents the error rates compiled from previous assignments, joined with the error rates from the Tree, Bagging, Random Forest, and Boosting methods using the three different approaches - VSA, LOOCV, 5-Fold CV. Looking at the VSA column, we see that **Tree** method performed as well as the best methods from the prior homework assignments with test error rate of **12.0192%**. Bagging and Boosting performed poorly, relative to the other methods, with Bagging having the worst test error rate of any method under the VSA approach **(17.7885%)**.
+
+In LOOCV, the Tree method again joined the best performing method from prior assignments (Logistic Regression and LDA) with an error rate of **14.4928%**. Random Forest also performed well, relative to the other methods. Bagging and Boosting performed poorly, relative to the other methods with Bagging having the highest test error rate of any method and any approach on the table at **20.4348%**.
+
+In 5-Fold CV, we see that Bagging is by far the best method from the entire table with a test error rate of **10%**. Tree and Boosting also tied the previously best performing methods under the 5-Fold CV approach with an error rate of **14.4928%**. None of the new methods performed poorly, relative to the previous methods used.
+
+
+```{r}
+# load credit screening data set
+credit.screening <- read.table("credit-screening.data", sep = ",")
+
+# add column names
+colnames(credit.screening) <- c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11",
+                                "A12", "A13", "A14", "A15", "A16")
+
+# change '?' to NA for imputation
+credit.screening[credit.screening == "?"] <- NA
+
+# change numeric values listed as factors and replace '+' with 'P' for Positive
+credit.screening$A2 <- as.numeric(credit.screening$A2)
+credit.screening$A14 <- as.numeric(credit.screening$A14)
+credit.screening$A16 <- as.factor(ifelse(credit.screening$A16 == "+", 'P', 'N'))
+
+# create function from stack overflow to impute factor variables with most common (https://stackoverflow.com/questions/36377813/impute-most-frequent-categorical-value-in-all-columns-in-data-frame)
+Mode <- function(x) {
+  ux <- sort(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+i1 <- !sapply(credit.screening, is.numeric)
+
+credit.screening[i1] <- lapply(credit.screening[i1], 
+                               function(x) replace(x, is.na(x), Mode(x[!is.na(x)])))
+
+# impute NA numerical values with the mean of the respective variable
+credit.screening <-
+  credit.screening %>% mutate_if(is.numeric, funs(replace(.,is.na(.), mean(., na.rm = TRUE))))
+
+credit.screening$A9 <- ifelse(credit.screening$A9 == 't', 1, 0)
+credit.screening$A10 <- ifelse(credit.screening$A10 == 't', 1, 0)
+```
+
+```{r}
+##### VSA #####
+# set seed for reproducibility
+set.seed(702)
+
+# create a sample size of 70% of the sample
+sample.size <- (0.70 * nrow(credit.screening))
+
+train_ind <- sample(seq_len(nrow(credit.screening)), size = sample.size)
+
+# split into train and test
+credit.train <- credit.screening[train_ind, ]
+credit.test <- credit.screening[-train_ind, ]
+
+# fit glm 
+credit.glm <- glm(A16 ~ A8 + A9 + A10 + A11, data = credit.train, family = binomial)
+# create prediction based on glm above
+glm.probs <- predict(credit.glm, credit.test, type = "response")
+glm.pred <- ifelse(glm.probs > 0.5, "P", "N")
+
+# fit lda
+credit.lda <- lda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for lda
+lda.pred <- predict(credit.lda, credit.test)
+
+# fit qda
+credit.qda <- qda(formula = A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# create prediction factor for qda
+qda.pred <- predict(credit.qda, credit.test)
+
+# Mclust
+credit.mclust <- MclustDA(credit.train[, 8:11], class = credit.train$A16)
+credit.mclust.sum <- summary(credit.mclust, parameters = TRUE, what = "classification",
+                             newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# Mclust with EDDA
+credit.edda <- MclustDA(credit.train[, 8:11], class = credit.train$A16,
+                        modelType = "EDDA")
+credit.edda.sum <- summary(credit.edda, parameters = TRUE, what = "classification",
+                           newdata = credit.test[, 8:11], newclass = credit.test$A16)
+
+# knn model
+# get matrices of predictor and response variables
+credit.train.X <- as.matrix(credit.train[, 8:11])
+credit.test.X <- as.matrix(credit.test[, 8:11])
+credit.A16 <- as.factor(credit.train$A16)
+
+# use KNN to predict A16 with k= 5 because that was best performing on HW6
+credit.knn5 <- knn(credit.train.X, credit.test.X, credit.A16, k=5)
+
+# get confusion matrices
+glm.cf <- table(credit.test$A16, glm.pred)
+names(dimnames(glm.cf)) <- c("Observed", "Predicted")
+
+lda.cf <- table(credit.test$A16, lda.pred$class)
+names(dimnames(lda.cf)) <- c("Observed", "Predicted")
+
+qda.cf <- table(credit.test$A16, qda.pred$class)
+names(dimnames(qda.cf)) <- c("Observed", "Predicted")
+
+# using KNN k=5 because it was best performing KNN model on HW6
+knn.cf5 <- table(credit.test$A16, credit.knn5)
+names(dimnames(knn.cf5)) <- c("Observed", "Predicted")
+
+# fit model using neural networking
+credit.nn <- neuralnet(A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+# summary(credit.nn)
+# credit.nn$result.matrix
+
+# create prediction based on nn above using subset of testing set and compute() function from 
+# neuralnet package
+nn.test <- subset(credit.test, select = c(A8, A9, A10, A11))
+# head(nn.test)
+nn.results <- compute(credit.nn, nn.test)
+nn.probs <- data.frame(Observed = credit.test$A16, Probability = nn.results$net.result[,2])
+nn.pred <- ifelse(nn.probs$Probability > 0.5, "P", "N")
+
+# create confusion matrix
+nn.cf <- table(credit.test$A16, nn.pred)
+names(dimnames(nn.cf)) <- c("Observed", "Predicted")
+
+# get error rates
+glm.err <- round(((glm.cf[1,2]+glm.cf[2,1])/nrow(credit.test)*100), 4)
+lda.err <- round(((lda.cf[1,2]+lda.cf[2,1])/nrow(credit.test)*100), 4)
+qda.err <- round(((qda.cf[1,2]+qda.cf[2,1])/nrow(credit.test)*100), 4)
+mclust.err <- round(((credit.mclust.sum$tab.newdata[1,2]+credit.mclust.sum$tab.newdata[2,1])/
+                       nrow(credit.test)*100), 4)
+edda.err <- round(((credit.edda.sum$tab.newdata[1,2]+credit.edda.sum$tab.newdata[2,1])/
+                     nrow(credit.test)*100), 4)
+knn5.err <- round(((knn.cf5[1,2]+knn.cf5[2,1])/nrow(credit.test)*100), 4)
+nn.err <- round(((nn.cf[1,2]+nn.cf[2,1])/nrow(credit.test)*100), 4)
+vsa_err_sum <- rbind(glm.err, knn5.err, lda.err, qda.err, mclust.err, edda.err, nn.err)
+```
+
+```{r}
+set.seed(702)
+# tree method vsa
+tree.credit <- tree(A16 ~ A8 + A9 + A10 + A11, data = credit.train)
+tree.pred <- predict(tree.credit, credit.test, type = "class")
+
+# get confusion matrix
+tree.cf <- table(credit.test$A16, tree.pred)
+names(dimnames(tree.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+tree.err <- round(((tree.cf[1,2]+tree.cf[2,1])/nrow(credit.test)*100), 4)
+
+
+# bagging method vsa
+bag.credit <- randomForest(A16 ~ A8 + A9 + A10 + A11, data = credit.train, mtry = 4, 
+                           ntree = 1000, importance = TRUE)
+bag.pred <- predict(bag.credit, credit.test, n.trees = 1000, type = "class")
+
+# get confusion matrix
+bag.cf <- table(credit.test$A16, bag.pred)
+names(dimnames(bag.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+bag.err <- round(((bag.cf[1,2]+bag.cf[2,1])/nrow(credit.test)*100), 4)
+
+
+# rf method vsa
+rf.credit <- randomForest(A16 ~ A8 + A9 + A10 + A11, data = credit.train, ntree = 1000,
+                          importance = TRUE)
+rf.pred <- predict(rf.credit, credit.test, n.trees = 1000, type = "class")
+
+# get confusion matrix
+rf.cf <- table(credit.test$A16, rf.pred)
+names(dimnames(rf.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+rf.err <- round(((rf.cf[1,2]+rf.cf[2,1])/nrow(credit.test)*100), 4)
+
+
+# boosting method vsa
+credit.boost.train <- credit.train
+credit.boost.train$A16 <- ifelse(credit.boost.train$A16 == "P", 1, 0)
+credit.boost.test <- credit.test
+credit.boost.test$A16 <- ifelse(credit.boost.test$A16 == "P", 1, 0)
+
+boost.credit <- gbm(A16 ~ A8 + A9 + A10 + A11, data = credit.boost.train,
+                    distribution = "bernoulli", n.trees = 1000, 
+                    interaction.depth = 4)
+boost.probs <- predict(boost.credit, credit.boost.test, n.trees = 1000,
+                      type = "response")
+boost.pred <- ifelse(boost.probs > 0.5, "P", "N")
+
+# get confusion matrix
+boost.cf <- table(credit.test$A16, boost.pred)
+names(dimnames(boost.cf)) <- c("Observed", "Predicted")
+
+# get error rate
+boost.err <- round(((boost.cf[1,2]+boost.cf[2,1])/nrow(credit.test)*100), 4)
+
+# get vsa summary of misclassification rates
+vsa_err_sum <- rbind(vsa_err_sum, tree.err, bag.err, rf.err, boost.err)
+```
+
+```{r}
+##### LOOCV #####
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# LOOCV on glm
+set.seed(702)
+loocv.glm.err <- rep(0, nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  fit.glm <- glm(formula = formula, data = credit.screening[-i, ], family = "binomial")
+  fit.pred <- ifelse(predict(fit.glm, credit.screening[i, ], type = "response") > 0.5, "P", "N")
+  loocv.glm.err[i] <- ifelse(credit.screening[i, ]$A16 == fit.pred, 0, 1)
+}
+loocv.glm.err <- round(mean(loocv.glm.err)*100, 4)
+
+# LOOCV for Neural Network
+set.seed(702)
+loocv.nn.err <- rep(0, nrow(credit.screening))
+library(plyr)
+pbar <- create_progress_bar('text')
+pbar$init(nrow(credit.screening))
+for (i in 1:nrow(credit.screening)) {
+  loocv.nn <- neuralnet(formula = formula, data = credit.screening, linear.output = FALSE)
+  results.nn <- compute(loocv.nn, credit.screening[i, ])
+  pred.nn <- ifelse(results.nn$net.result[,2] > 0.5, "P", "N")
+  loocv.nn.err[i] <- ifelse(credit.screening[i, ]$A16 == pred.nn, 0, 1)
+  pbar$step()
+}
+loocv.nn.err <- round(mean(loocv.nn.err)*100, 4)
+
+# LOOCV for LDA 
+credit.lda.loocv <- lda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.lda.err <- round(mean(credit.lda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for QDA
+credit.qda.loocv <- qda(formula = formula, data = credit.screening, CV = TRUE)
+loocv.qda.err <- round(mean(credit.qda.loocv$class != credit.screening$A16)*100, 4)
+
+# LOOCV for MClustDA & MClustDA w/ EDDA
+credit.mclust <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16)
+mclust.loocv <- cvMclustDA(credit.mclust, nfold = nrow(credit.screening))
+loocv.mclust.err <- round(mclust.loocv$error*100, 4)
+
+credit.edda <- MclustDA(credit.screening[, 8:11], class = credit.screening$A16, modelType = "EDDA")
+edda.loocv <- cvMclustDA(credit.edda, nfold = nrow(credit.screening))
+loocv.edda.err <- round(edda.loocv$error*100, 4)
+
+# LOOCV for KNN
+credit.knn.loocv <- knn.cv(as.matrix(credit.screening[, 8:11]), 
+                     cl = as.factor(credit.screening$A16), k = 5, use.all = TRUE, prob = FALSE)
+loocv.knn.err <- round(mean(credit.knn.loocv != credit.screening$A16)*100, 4)
+
+loocv_err_sum <- rbind(loocv.glm.err, loocv.knn.err, loocv.lda.err, 
+                       loocv.qda.err, loocv.mclust.err, loocv.edda.err, loocv.nn.err)
+```
+
+```{r}
+set.seed(702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+loocv.tree.err <- c()
+loocv.bag.err <- c()
+loocv.rf.err <- c()
+loocv.boost.err <- c()
+credit.boost <- credit.screening
+credit.boost$A16 <- ifelse(credit.boost$A16 == "P", 1, 0)
+for (i in 1:nrow(credit.screening)) {
+  # tree LOOCV
+  tree.loocv <- tree(formula = formula, data = credit.screening[-i,])
+  tree.loocv.pred <- predict(tree.loocv, credit.screening[i,], type = "class")
+  loocv.tree.err[i] <- ifelse(credit.screening[i, ]$A16 == tree.loocv.pred, 0, 1)
+  
+  # bagging LOOCV
+  bag.loocv <- randomForest(formula, data = credit.screening[-i,], mtry = 4,
+                            ntree = 1000, importance = TRUE)
+  bag.loocv.pred <- predict(bag.loocv, credit.screening[i,], n.tree = 1000,
+                            type = "class")
+  loocv.bag.err[i] <- ifelse(credit.screening[i, ]$A16 == bag.loocv.pred, 0 , 1)
+  
+  # randomForest LOOCV
+  rf.loocv <- randomForest(formula, data = credit.screening[-i,], ntree = 1000,
+                           importance = TRUE)
+  rf.loocv.pred <- predict(rf.loocv, credit.screening[i,], n.tree = 1000,
+                           type = "class")
+  loocv.rf.err[i] <- ifelse(credit.screening[i,]$A16 == rf.loocv.pred, 0, 1)
+  
+  #boosting LOOCV
+  boost.loocv <- gbm(formula = formula, data = credit.boost[-i,],
+                     distribution = "bernoulli", n.trees = 1000,
+                     interaction.depth = 4)
+  boost.loocv.pred <- ifelse(predict(boost.loocv, credit.boost[i,],
+                                     n.trees = 1000, type = "response")
+                             > 0.5, "P", "N")
+  loocv.boost.err[i] <- ifelse(credit.screening[i,]$A16 == boost.loocv.pred, 0, 1)
+}
+
+loocv.tree.err <- round(mean(loocv.tree.err)*100, 4)
+loocv.bag.err <- round(mean(loocv.bag.err)*100, 4)
+loocv.rf.err <- round(mean(loocv.rf.err)*100, 4)
+loocv.boost.err <- round(mean(loocv.boost.err)*100, 4)
+
+# add to loocv error sum
+loocv_err_sum <- rbind(loocv_err_sum, loocv.tree.err, loocv.bag.err, loocv.rf.err,
+                       loocv.boost.err)
+```
+
+```{r}
+##### 5-fold CV #####
+set.seed (702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# randomly shuffle the data set and remove unneccessary columns
+credit.dat <- credit.screening[sample(nrow(credit.screening)),]
+credit.dat <- credit.dat[, c(8:11, 16)]
+
+# Create 5 equal size folds 
+folds <- cut(seq(1, nrow(credit.screening)), breaks = 5, labels = FALSE)
+
+# Perform 5 fold CV
+cv5.glm.err <- c()
+cv5.lda.err <- c()
+cv5.qda.err <- c()
+cv5.mclust.err <- c()
+cv5.edda.err <- c()
+cv5.nn.err <- c()
+cv5.knn.err <- c()
+for (i in 1:5){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- credit.dat[test_indeces, ]
+  train_set <- credit.dat[-test_indeces, ]
+  # logistic regression
+  glm <- glm(formula = formula, data = train_set, family = "binomial")
+  glm.prediction <- ifelse(predict(glm, test_set, type = "response") > 0.5, "P", "N")
+  cv5.glm.err[i] <- mean(test_set$A16 != glm.prediction)
+  # neural network
+  nn.5 <- neuralnet(formula = formula, data = train_set)
+  nn.test.5 <- subset(test_set, select = c(A8, A9, A10, A11))
+  nn.results.5 <- compute(nn.5, nn.test.5)
+  nn.pred.5 <- ifelse(nn.results.5$net.result[,2] > 0.5, "P", "N")
+  cv5.nn.err[i] <- mean(test_set$A16 != nn.pred.5)
+  # lda
+  lda <- lda(formula = formula, data = train_set)
+  lda.prediction <- predict(lda, test_set)
+  cv5.lda.err[i] <- mean(test_set$A16 != lda.prediction$class)
+  # qda
+  qda <- qda(formula = formula, data = train_set)
+  qda.prediction <- predict(qda, test_set)
+  cv5.qda.err[i] <- mean(test_set$A16 != qda.prediction$class)
+  # Mclust
+  mclust.5 <- MclustDA(train_set[, 1:4], class = train_set$A16)
+  mclust.5.sum <- summary(mclust.5, parameters = TRUE, what = "classification",
+                             newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.mclust.err[i] <- mclust.5.sum$err.newdata 
+  # Mclust w/ EDDA
+  edda.5 <- MclustDA(train_set[, 1:4], class = train_set$A16, modelType = "EDDA")
+  edda.5.sum <- summary(edda.5, parameters = TRUE, what = "classification", 
+                        newdata = test_set[, 1:4], newclass = test_set$A16)
+  cv5.edda.err[i] <- edda.5.sum$err.newdata   
+  # knn k=5
+  knn.5 <- knn(as.matrix(train_set[, 1:4]), as.matrix(test_set[, 1:4]), 
+               as.factor(train_set$A16), k=5)
+  cv5.knn.err[i] <- mean(test_set$A16 != knn.5)
+}
+
+# format for chart
+cv5.glm.err <- round(mean(cv5.glm.err)*100, 4)
+cv5.lda.err <- round(mean(cv5.lda.err)*100, 4)
+cv5.qda.err <- round(mean(cv5.qda.err)*100, 4)
+cv5.nn.err <- round(mean(cv5.nn.err)*100, 4)
+cv5.mclust.err <- round(mean(cv5.mclust.err)*100, 4)
+cv5.edda.err <- round(mean(cv5.edda.err)*100, 4)
+cv5.knn.err <- round(mean(cv5.knn.err)*100, 4)
+
+cv5_err_sum <- rbind(cv5.glm.err, cv5.knn.err, cv5.lda.err, cv5.qda.err, 
+                     cv5.mclust.err, cv5.edda.err, cv5.nn.err)
+```
+
+```{r}
+set.seed (702)
+formula <- A16 ~ A8 + A9 + A10 + A11
+
+# randomly shuffle the data set and remove unneccessary columns
+credit.dat <- credit.screening[sample(nrow(credit.screening)),]
+credit.dat <- credit.dat[, c(8:11, 16)]
+
+# Create 5 equal size folds 
+folds <- cut(seq(1, nrow(credit.screening)), breaks = 5, labels = FALSE)
+cv5.tree.err <- c()
+cv5.bag.err <- c()
+cv5.rf.err <- c()
+cv5.boost.err <- c()
+for (i in 1:5){
+  test_indeces <- which(folds == i, arr.ind = TRUE)
+  test_set <- credit.dat[test_indeces, ]
+  train_set <- credit.dat[-test_indeces, ]
+  
+  # get sets for boost
+  train_set.boost <- train_set
+  test_set.boost <- test_set
+  train_set.boost$A16 <- ifelse(train_set.boost$A16 == "P", 1, 0)
+  test_set.boost$A16 <- ifelse(test_set.boost$A16 == "P", 1, 0)
+
+  # tree k = 5
+  tree.5 <- tree(formula = formula, data = train_set)
+  tree.prediction <- predict(tree.5, test_set, type = "class")
+  cv5.tree.err[i] <- mean(test_set$A16 != tree.prediction)
+  
+  # bagging k = 5
+  bag.5 <- randomForest(formula, data = train_set, 
+                             mtry = 4, ntree = 1000, importance = TRUE)
+  bag.prediction <- predict(bag.credit, test_set, n.trees = 1000, type = "class")
+  cv5.bag.err[i] <- mean(test_set$A16 != bag.prediction)
+  
+  # rf k = 5
+  rf.5 <- randomForest(formula, data = train_set, 
+                            ntree = 1000, importance = TRUE)
+  rf.prediction <- predict(rf.5, test_set, n.trees = 1000, type = "class")
+  cv5.rf.err[i] <- mean(test_set$A16 != rf.prediction)
+  
+  # boosting k = 5
+  boost.5 <- gbm(formula = formula, data = train_set.boost, 
+                 distribution = "bernoulli", n.trees = 1000,
+                 interaction.depth = 4)
+  boost.prediction <- (ifelse(predict(boost.5, test_set.boost, n.trees = 1000,
+                                      type = "response") > 0.5, "P", "N"))
+  cv5.boost.err <- mean(test_set$A16 != boost.prediction)
+}
+
+cv5.tree.err <- round(mean(cv5.tree.err)*100, 4)
+cv5.bag.err <- round(mean(cv5.bag.err)*100, 4)
+cv5.rf.err <- round(mean(cv5.rf.err)*100, 4)
+cv5.boost.err <-round(mean(cv5.boost.err)*100, 4)
+
+# compile error summary for 5-fold CV
+cv5_err_sum <- rbind(cv5_err_sum, cv5.tree.err, cv5.bag.err, cv5.rf.err,
+                     cv5.boost.err)
+```
+
+```{r}
+Method <- c("Logistic Reg", "KNN", "LDA", "QDA", "MclustDA", "MclustDA (EDDA)", 
+            "Neural Network", "Tree", "Bagging", "Random Forest", "Boosting")
+final_sum <- as.data.frame(cbind(Method, vsa_err_sum, loocv_err_sum, cv5_err_sum))
+rownames(final_sum) <- NULL
+colnames(final_sum) <- c("Method", "VSA", "LOOCV", "5-Fold CV")
+
+kable(final_sum, caption = "Test Error by Validation Approach (%)")
+```
